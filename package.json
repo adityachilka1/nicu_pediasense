@@ -1,0 +1,53 @@
+{
+  "name": "nicu-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "db:seed": "node --experimental-vm-modules prisma/seed.js",
+    "db:migrate": "npx prisma migrate dev",
+    "db:studio": "npx prisma studio"
+  },
+  "prisma": {
+    "seed": "node --experimental-vm-modules prisma/seed.js"
+  },
+  "dependencies": {
+    "@next/swc-darwin-arm64": "^16.1.1",
+    "@prisma/adapter-better-sqlite3": "^7.2.0",
+    "@prisma/client": "^7.2.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.5.0",
+    "dotenv": "^17.2.3",
+    "ioredis": "^5.8.2",
+    "next": "^16.1.1",
+    "next-auth": "^5.0.0-beta.30",
+    "prisma": "^7.2.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-react": "^7.28.5",
+    "@playwright/test": "^1.57.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@types/jest": "^30.0.0",
+    "autoprefixer": "^10.4.19",
+    "babel-jest": "^30.2.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "playwright": "^1.57.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3"
+  }
+}

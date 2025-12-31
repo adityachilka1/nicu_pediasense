@@ -1,0 +1,830 @@
+// NICU Dashboard - Prisma Schema
+// Database: SQLite (development) / PostgreSQL (production)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// =====================================================
+// USERS & AUTHENTICATION
+// =====================================================
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  role          String    // admin, physician, charge_nurse, staff_nurse, administrative
+  initials      String?
+  active        Boolean   @default(true)
+  lastLogin     DateTime? @map("last_login")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  notes         Note[]
+  alarmAcks     AlarmAcknowledgment[]
+  auditLogs     AuditLog[]
+  familyMessages FamilyMessage[]
+  notifications Notification[]
+
+  // Clinical workflow relations
+  ordersCreated       Order[]          @relation("OrderingUser")
+  ordersDiscontinued  Order[]          @relation("DiscontinuedByUser")
+  carePlansCreated    CarePlan[]       @relation("CarePlanCreatedBy")
+  dischargePlansCreated DischargePlan[] @relation("DischargePlanCreatedBy")
+  handoffNotesAuthored HandoffNote[]   @relation("HandoffAuthor")
+  handoffNotesAcked   HandoffNote[]    @relation("HandoffAcknowledger")
+
+  // Indexes for common queries
+  @@index([role])                    // Filter users by role
+  @@index([active])                  // Filter active/inactive users
+  @@map("users")
+}
+
+// =====================================================
+// BEDS & PATIENTS
+// =====================================================
+
+model Bed {
+  id          Int       @id @default(autoincrement())
+  bedNumber   String    @unique @map("bed_number")
+  unit        String    @default("NICU")
+  status      String    @default("available") // available, occupied, cleaning, maintenance
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  patient     Patient?
+  devices     Device[]
+
+  @@map("beds")
+}
+
+model Patient {
+  id              Int       @id @default(autoincrement())
+  mrn             String    @unique // Medical Record Number
+  name            String
+  dateOfBirth     DateTime  @map("date_of_birth")
+  gender          String    // M, F, U
+
+  // NICU-specific fields
+  gestationalAge  String?   @map("gestational_age") // e.g., "32+4"
+  birthWeight     Float?    @map("birth_weight") // kg
+  currentWeight   Float?    @map("current_weight") // kg
+  dayOfLife       Int       @default(1) @map("day_of_life")
+
+  // Assignment
+  bedId           Int?      @unique @map("bed_id")
+  bed             Bed?      @relation(fields: [bedId], references: [id])
+
+  // Status
+  status          String    @default("normal") // normal, warning, critical, discharged
+  admitDate       DateTime  @default(now()) @map("admit_date")
+  dischargeDate   DateTime? @map("discharge_date")
+
+  // Alarm limits (JSON stored as string in SQLite)
+  alarmLimits     String?   @map("alarm_limits") // JSON: { spo2: [88, 100], pr: [100, 180], rr: [25, 70] }
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  vitals             Vital[]
+  alarms             Alarm[]
+  notes              Note[]
+  familyContacts     FamilyContact[]
+  growthMeasurements GrowthMeasurement[]
+  feedingLogs        FeedingLog[]
+  flowsheetEntries   FlowsheetEntry[]
+
+  // Clinical workflow relations
+  orders             Order[]
+  carePlans          CarePlan[]
+  dischargePlan      DischargePlan?
+  handoffNotes       HandoffNote[]
+
+  // Indexes for common queries
+  @@index([status])                    // Filter by patient status
+  @@index([status, dischargeDate])     // Active patients query (status != discharged)
+  @@index([admitDate])                 // Sort/filter by admission date
+  @@index([name])                      // Search patients by name
+  @@map("patients")
+}
+
+// =====================================================
+// VITAL SIGNS
+// =====================================================
+
+model Vital {
+  id          Int       @id @default(autoincrement())
+  patientId   Int       @map("patient_id")
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Vital signs
+  heartRate   Int?      @map("heart_rate") // bpm (PR - Pulse Rate)
+  spo2        Int?      // %
+  respRate    Int?      @map("resp_rate") // breaths/min
+  temperature Float?    // Celsius
+  fio2        Int?      // % Fraction of Inspired O2
+  pi          Float?    // Perfusion Index
+
+  // Blood pressure (optional)
+  bpSystolic  Int?      @map("bp_systolic")
+  bpDiastolic Int?      @map("bp_diastolic")
+  bpMean      Int?      @map("bp_mean")
+
+  // Metadata
+  source      String    @default("monitor") // monitor, manual, device
+  recordedAt  DateTime  @default(now()) @map("recorded_at")
+
+  @@index([patientId, recordedAt])
+  @@map("vitals")
+}
+
+// =====================================================
+// ALARMS
+// =====================================================
+
+model Alarm {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  type          String    // critical, warning, advisory
+  parameter     String    // spo2, pr, rr, temp, apnea, brady
+  value         Float?    // The value that triggered the alarm
+  threshold     Float?    // The threshold that was violated
+  message       String
+
+  // Status
+  status        String    @default("active") // active, acknowledged, silenced, resolved
+  triggeredAt   DateTime  @default(now()) @map("triggered_at")
+  resolvedAt    DateTime? @map("resolved_at")
+  silencedUntil DateTime? @map("silenced_until")
+
+  // Relations
+  acknowledgments AlarmAcknowledgment[]
+
+  // Indexes for common queries
+  @@index([patientId, status])         // Patient's alarms by status
+  @@index([triggeredAt])               // Sort by trigger time
+  @@index([type, status])              // Filter by alarm type and status (dashboard)
+  @@index([status, triggeredAt])       // Active alarms sorted by time
+  @@map("alarms")
+}
+
+model AlarmAcknowledgment {
+  id          Int       @id @default(autoincrement())
+  alarmId     Int       @map("alarm_id")
+  alarm       Alarm     @relation(fields: [alarmId], references: [id], onDelete: Cascade)
+  userId      Int       @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+
+  action      String    // acknowledged, silenced, escalated
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Indexes for common queries
+  @@index([alarmId])                   // Find acknowledgments for an alarm
+  @@index([userId, createdAt])         // User's acknowledgment history
+  @@map("alarm_acknowledgments")
+}
+
+// =====================================================
+// CLINICAL NOTES
+// =====================================================
+
+model Note {
+  id          Int       @id @default(autoincrement())
+  patientId   Int       @map("patient_id")
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  authorId    Int       @map("author_id")
+  author      User      @relation(fields: [authorId], references: [id])
+
+  type        String    @default("progress") // progress, nursing, physician, handoff
+  content     String
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Indexes for common queries
+  @@index([patientId, createdAt])       // Patient's notes sorted by time
+  @@index([patientId, type, createdAt]) // Filtered notes by type
+  @@index([authorId, createdAt])        // Author's notes ("my notes" view)
+  @@map("notes")
+}
+
+// =====================================================
+// AUDIT LOG
+// =====================================================
+
+model AuditLog {
+  id          Int       @id @default(autoincrement())
+  userId      Int?      @map("user_id")
+  user        User?     @relation(fields: [userId], references: [id])
+
+  action      String    // login, logout, view_patient, update_patient, acknowledge_alarm, etc.
+  resource    String?   // patient, alarm, note, etc.
+  resourceId  Int?      @map("resource_id")
+  details     String?   // JSON with additional context
+  ipAddress   String?   @map("ip_address")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
+
+// =====================================================
+// MEDICAL DEVICES
+// =====================================================
+
+model Device {
+  id              Int       @id @default(autoincrement())
+  serialNumber    String    @unique @map("serial_number")
+  name            String
+  type            String    // monitor, ventilator, infusion_pump, phototherapy, cpap, incubator, pulse_oximeter, ecg
+  manufacturer    String?
+  model           String?
+
+  // Assignment
+  bedId           Int?      @map("bed_id")
+  bed             Bed?      @relation(fields: [bedId], references: [id])
+
+  // Status
+  status          String    @default("active") // active, inactive, maintenance, offline, error
+  lastPingAt      DateTime? @map("last_ping_at")
+  firmwareVersion String?   @map("firmware_version")
+
+  // Configuration (JSON stored as string in SQLite)
+  config          String?   // JSON: { ip: "...", port: ..., protocol: "...", settings: {...} }
+
+  // Calibration & Maintenance
+  lastCalibration DateTime? @map("last_calibration")
+  nextCalibration DateTime? @map("next_calibration")
+  lastMaintenance DateTime? @map("last_maintenance")
+  nextMaintenance DateTime? @map("next_maintenance")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  logs            DeviceLog[]
+
+  @@index([bedId])
+  @@index([type, status])
+  @@map("devices")
+}
+
+model DeviceLog {
+  id          Int       @id @default(autoincrement())
+  deviceId    Int       @map("device_id")
+  device      Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  level       String    @default("info") // info, warning, error, critical
+  category    String    // status_change, calibration, maintenance, error, alert, connection, data_transmission
+  message     String
+  details     String?   // JSON with additional context
+
+  // Optional user association (for manual entries)
+  userId      Int?      @map("user_id")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([deviceId, createdAt])
+  @@index([level, createdAt])
+  @@map("device_logs")
+}
+
+// =====================================================
+// ALARM LIMIT PRESETS
+// =====================================================
+
+model AlarmLimitPreset {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique // preterm_24_28, preterm_28_32, preterm_32_37, term, custom
+  displayName String    @map("display_name") // "Preterm (24-28 weeks)", etc.
+  description String?
+
+  // Limits (JSON stored as string in SQLite)
+  // Format: { parameter: [min, max], ... }
+  limits      String    // JSON: { spo2: [88, 95], pr: [100, 180], rr: [30, 70], temp: [36.5, 37.5] }
+
+  isDefault   Boolean   @default(false) @map("is_default")
+  isActive    Boolean   @default(true) @map("is_active")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("alarm_limit_presets")
+}
+
+// =====================================================
+// GROWTH MEASUREMENTS
+// =====================================================
+
+model GrowthMeasurement {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  weight        Float?    // kg
+  length        Float?    // cm
+  headCirc      Float?    @map("head_circ") // cm (head circumference)
+
+  // Percentiles (calculated based on gestational age)
+  weightPercentile   Float?  @map("weight_percentile")
+  lengthPercentile   Float?  @map("length_percentile")
+  headCircPercentile Float?  @map("head_circ_percentile")
+
+  measuredBy    String?   @map("measured_by") // User initials or name
+  notes         String?
+  measuredAt    DateTime  @default(now()) @map("measured_at")
+
+  @@index([patientId, measuredAt])
+  @@map("growth_measurements")
+}
+
+// =====================================================
+// FEEDING LOGS
+// =====================================================
+
+model FeedingLog {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  feedingType   String    @map("feeding_type") // breast, formula, fortified, tpn, enteral
+  route         String    // oral, ng (nasogastric), og (orogastric), gt (gastrostomy)
+  volumeOrdered Float?    @map("volume_ordered") // mL
+  volumeGiven   Float?    @map("volume_given") // mL
+  volumeResidual Float?   @map("volume_residual") // mL (gastric residual)
+  residualColor String?   @map("residual_color") // clear, bilious, bloody, etc.
+  tolerance     String?   // good, fair, poor
+  emesis        Boolean   @default(false)
+  emesisAmount  Float?    @map("emesis_amount") // mL
+
+  // Fortification details
+  fortified     Boolean   @default(false)
+  calories      Int?      // kcal/oz or kcal/100mL
+
+  notes         String?
+  recordedBy    String?   @map("recorded_by")
+  recordedAt    DateTime  @default(now()) @map("recorded_at")
+
+  @@index([patientId, recordedAt])
+  @@map("feeding_logs")
+}
+
+// =====================================================
+// FLOWSHEET (Hourly I/O)
+// =====================================================
+
+model FlowsheetEntry {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Time reference
+  shiftDate     DateTime  @map("shift_date") // Date of the shift
+  hour          Int       // 0-23 hour of recording
+
+  // Intake (mL)
+  ivFluids      Float?    @map("iv_fluids")
+  tpn           Float?    // Total Parenteral Nutrition
+  lipids        Float?
+  bloodProducts Float?    @map("blood_products")
+  medications   Float?
+  enteral       Float?    // Enteral feeds
+
+  // Output (mL)
+  urine         Float?
+  stool         Float?
+  emesis        Float?
+  gastricOutput Float?    @map("gastric_output") // OG/NG output
+  ostomyOutput  Float?    @map("ostomy_output")
+  drainOutput   Float?    @map("drain_output")
+
+  // Stool characteristics
+  stoolCount    Int?      @map("stool_count")
+  stoolType     String?   @map("stool_type") // meconium, transitional, normal, loose, watery
+
+  // Urine characteristics
+  urineCount    Int?      @map("urine_count") // Number of wet diapers
+  specificGravity Float?  @map("specific_gravity")
+
+  notes         String?
+  recordedBy    String?   @map("recorded_by")
+  recordedAt    DateTime  @default(now()) @map("recorded_at")
+
+  @@unique([patientId, shiftDate, hour])
+  @@index([patientId, shiftDate])
+  @@map("flowsheet_entries")
+}
+
+// =====================================================
+// FAMILY COMMUNICATION
+// =====================================================
+
+model FamilyContact {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Contact details
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  relationship  String    // mother, father, guardian, grandparent, sibling, other
+  email         String?
+  phone         String?
+  preferredContact String @default("phone") @map("preferred_contact") // phone, email, both
+
+  // Permissions
+  isPrimaryContact  Boolean @default(false) @map("is_primary_contact")
+  canReceiveUpdates Boolean @default(true) @map("can_receive_updates")
+  canViewRecords    Boolean @default(false) @map("can_view_records")
+
+  // Status
+  active        Boolean   @default(true)
+  verifiedAt    DateTime? @map("verified_at")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  messages      FamilyMessage[]
+  educationProgress EducationProgress[]
+
+  // Indexes for common queries
+  @@index([patientId])                   // Family contacts for a patient
+  @@index([patientId, isPrimaryContact]) // Find primary contact quickly
+  @@index([email])                       // Lookup by email
+  @@map("family_contacts")
+}
+
+model FamilyMessage {
+  id            Int       @id @default(autoincrement())
+  familyContactId Int     @map("family_contact_id")
+  familyContact FamilyContact @relation(fields: [familyContactId], references: [id], onDelete: Cascade)
+  senderId      Int?      @map("sender_id")
+  sender        User?     @relation(fields: [senderId], references: [id])
+
+  // Message content
+  subject       String?
+  content       String
+  messageType   String    @default("general") @map("message_type") // general, update, alert, education
+
+  // Delivery status
+  status        String    @default("pending") // pending, sent, delivered, read, failed
+  sentAt        DateTime? @map("sent_at")
+  deliveredAt   DateTime? @map("delivered_at")
+  readAt        DateTime? @map("read_at")
+
+  // Metadata
+  channel       String    @default("app") // app, email, sms
+  isInbound     Boolean   @default(false) @map("is_inbound")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Indexes for common queries
+  @@index([familyContactId, createdAt])  // Messages for a contact
+  @@index([senderId])                    // Messages by sender
+  @@index([status, createdAt])           // Pending messages for delivery
+  @@map("family_messages")
+}
+
+model EducationMaterial {
+  id            Int       @id @default(autoincrement())
+
+  // Content
+  title         String
+  description   String?
+  content       String    // Can be markdown or HTML
+  contentType   String    @default("article") @map("content_type") // article, video, checklist, faq
+  category      String    // feeding, developmental_care, discharge_prep, general_nicu, kangaroo_care, etc.
+
+  // Targeting
+  gestationalAgeMin Int?  @map("gestational_age_min") // Weeks
+  gestationalAgeMax Int?  @map("gestational_age_max")
+  dayOfLifeMin  Int?      @map("day_of_life_min")
+  dayOfLifeMax  Int?      @map("day_of_life_max")
+
+  // Metadata
+  estimatedMinutes Int?   @map("estimated_minutes")
+  sortOrder     Int       @default(0) @map("sort_order")
+  active        Boolean   @default(true)
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  progress      EducationProgress[]
+
+  @@index([category])
+  @@map("education_materials")
+}
+
+model EducationProgress {
+  id            Int       @id @default(autoincrement())
+  familyContactId Int     @map("family_contact_id")
+  familyContact FamilyContact @relation(fields: [familyContactId], references: [id], onDelete: Cascade)
+  materialId    Int       @map("material_id")
+  material      EducationMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  // Progress tracking
+  status        String    @default("not_started") // not_started, in_progress, completed
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  timeSpentSeconds Int    @default(0) @map("time_spent_seconds")
+
+  // Quiz/assessment results if applicable
+  quizScore     Float?    @map("quiz_score")
+  attempts      Int       @default(0)
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([familyContactId, materialId])
+  @@index([familyContactId])
+  @@index([materialId])
+  @@map("education_progress")
+}
+
+// =====================================================
+// USER NOTIFICATIONS
+// =====================================================
+
+model Notification {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Content
+  title         String
+  message       String
+  type          String    @default("info") // info, warning, alert, success, task
+  category      String    @default("system") // system, patient, alarm, message, task, announcement
+  priority      String    @default("normal") // low, normal, high, urgent
+
+  // Related entities (for navigation)
+  resourceType  String?   @map("resource_type") // patient, alarm, message, task
+  resourceId    Int?      @map("resource_id")
+
+  // Status
+  status        String    @default("unread") // unread, read, dismissed, archived
+  readAt        DateTime? @map("read_at")
+  dismissedAt   DateTime? @map("dismissed_at")
+
+  // Scheduling
+  expiresAt     DateTime? @map("expires_at")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Indexes for common queries
+  @@index([userId, status])              // User's notifications by status
+  @@index([userId, createdAt])           // User's notifications by time
+  @@index([userId, status, priority])    // Urgent unread notifications
+  @@index([category])                    // Filter by category
+  @@index([expiresAt])                   // Cleanup expired notifications
+  @@map("notifications")
+}
+
+// =====================================================
+// MEDICAL ORDERS
+// =====================================================
+
+model Order {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  orderingId    Int       @map("ordering_id")
+  ordering      User      @relation("OrderingUser", fields: [orderingId], references: [id])
+
+  // Order details
+  category      String    // medication, lab, imaging, diet, nursing, respiratory, procedure
+  orderType     String    @map("order_type") // one_time, recurring, prn, continuous
+  priority      String    @default("routine") // stat, urgent, routine, scheduled
+  orderSetId    Int?      @map("order_set_id")
+  orderSet      OrderSet? @relation(fields: [orderSetId], references: [id])
+
+  // Order content
+  name          String    // Order name/description
+  details       String?   // JSON with order-specific details (dose, route, frequency, etc.)
+  instructions  String?   // Additional instructions
+
+  // Status tracking
+  status        String    @default("pending") // pending, active, completed, discontinued, cancelled
+  startTime     DateTime? @map("start_time")
+  endTime       DateTime? @map("end_time")
+  discontinuedAt DateTime? @map("discontinued_at")
+  discontinuedById Int?    @map("discontinued_by_id")
+  discontinuedBy User?    @relation("DiscontinuedByUser", fields: [discontinuedById], references: [id])
+  discontinueReason String? @map("discontinue_reason")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Indexes for common queries
+  @@index([patientId, status])          // Patient's orders by status
+  @@index([patientId, category])        // Patient's orders by category
+  @@index([patientId, status, category]) // Composite for filtered queries
+  @@index([orderingId, createdAt])      // "My orders" view
+  @@index([status, priority])           // Filter by status and priority
+  @@index([createdAt])                  // Sort by creation date
+  @@map("orders")
+}
+
+model OrderSet {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  category    String    // admission, respiratory, nutrition, infection, discharge
+  items       String    // JSON array of order templates
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  orders      Order[]
+
+  @@map("order_sets")
+}
+
+// =====================================================
+// CARE PLANS
+// =====================================================
+
+model CarePlan {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdById   Int       @map("created_by_id")
+  createdBy     User      @relation("CarePlanCreatedBy", fields: [createdById], references: [id])
+
+  // Plan details
+  title         String
+  category      String    // respiratory, nutrition, neuro, infection, growth, skin, family
+  description   String?
+  goals         String?   // JSON array of care goals
+  priority      String    @default("medium") // high, medium, low
+
+  // Status
+  status        String    @default("active") // active, on_hold, completed, discontinued
+  startDate     DateTime  @default(now()) @map("start_date")
+  targetDate    DateTime? @map("target_date")
+  completedAt   DateTime? @map("completed_at")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  items         CarePlanItem[]
+
+  // Indexes for common queries
+  @@index([patientId, status])          // Patient's care plans by status
+  @@index([category])                   // Filter by category
+  @@index([createdById, createdAt])     // "My care plans" view
+  @@index([priority, status])           // Priority-based filtering
+  @@map("care_plans")
+}
+
+model CarePlanItem {
+  id          Int       @id @default(autoincrement())
+  carePlanId  Int       @map("care_plan_id")
+  carePlan    CarePlan  @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
+
+  // Item details
+  description String
+  itemType    String    @default("task") @map("item_type") // task, assessment, intervention, education
+  frequency   String?   // once, daily, weekly, prn
+  dueDate     DateTime? @map("due_date")
+
+  // Status
+  status      String    @default("pending") // pending, in_progress, completed, skipped
+  completedAt DateTime? @map("completed_at")
+  completedById Int?    @map("completed_by_id")
+  notes       String?
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Indexes for common queries
+  @@index([carePlanId, status])         // Care plan items by status
+  @@index([dueDate, status])            // Due items (for reminders)
+  @@map("care_plan_items")
+}
+
+// =====================================================
+// DISCHARGE PLANNING
+// =====================================================
+
+model DischargePlan {
+  id                Int       @id @default(autoincrement())
+  patientId         Int       @unique @map("patient_id")
+  patient           Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdById       Int       @map("created_by_id")
+  createdBy         User      @relation("DischargePlanCreatedBy", fields: [createdById], references: [id])
+
+  // Discharge planning
+  estimatedDate     DateTime? @map("estimated_date")
+  actualDate        DateTime? @map("actual_date")
+  disposition       String?   // home, transfer, hospice, deceased
+  primaryCaregiver  String?   @map("primary_caregiver")
+  caregiverPhone    String?   @map("caregiver_phone")
+
+  // Status
+  status            String    @default("planning") // planning, ready, pending_approval, discharged, cancelled
+  readinessScore    Int?      @map("readiness_score") // 0-100
+
+  // Notes
+  specialInstructions String? @map("special_instructions")
+  followUpPlan      String?   @map("follow_up_plan")
+
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  checklistItems    DischargeChecklistItem[]
+
+  // Indexes for common queries
+  @@index([status])                      // Filter by discharge status
+  @@index([estimatedDate])               // Upcoming discharges
+  @@index([status, estimatedDate])       // Ready patients by date
+  @@map("discharge_plans")
+}
+
+model DischargeChecklistItem {
+  id              Int           @id @default(autoincrement())
+  dischargePlanId Int           @map("discharge_plan_id")
+  dischargePlan   DischargePlan @relation(fields: [dischargePlanId], references: [id], onDelete: Cascade)
+
+  // Checklist item details
+  category        String        // medical, equipment, education, followup, documentation, safety
+  description     String
+  required        Boolean       @default(true)
+  orderIndex      Int           @default(0) @map("order_index")
+
+  // Status
+  status          String        @default("pending") // pending, in_progress, completed, not_applicable
+  completedAt     DateTime?     @map("completed_at")
+  completedById   Int?          @map("completed_by_id")
+  notes           String?
+
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([dischargePlanId, status])
+  @@index([category])
+  @@map("discharge_checklist_items")
+}
+
+// =====================================================
+// SHIFT HANDOFF
+// =====================================================
+
+model HandoffNote {
+  id            Int       @id @default(autoincrement())
+  patientId     Int       @map("patient_id")
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  authorId      Int       @map("author_id")
+  author        User      @relation("HandoffAuthor", fields: [authorId], references: [id])
+
+  // Shift information
+  shift         String    // day, evening, night
+  shiftDate     DateTime  @map("shift_date")
+
+  // SBAR format content (Situation, Background, Assessment, Recommendation)
+  situation     String?   // Current patient status/concerns
+  background    String?   // Relevant history/context
+  assessment    String?   // Clinical assessment
+  recommendation String?  // Recommendations for incoming shift
+
+  // Additional details
+  acuity        String?   // stable, moderate, critical
+  keyEvents     String?   @map("key_events") // JSON array of key events during shift
+  pendingTasks  String?   @map("pending_tasks") // JSON array of pending tasks
+  alertsFlags   String?   @map("alerts_flags") // JSON array of alerts/flags to monitor
+
+  // Handoff status
+  status        String    @default("draft") // draft, submitted, acknowledged
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedById Int?   @map("acknowledged_by_id")
+  acknowledgedBy User?    @relation("HandoffAcknowledger", fields: [acknowledgedById], references: [id])
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Indexes for common queries
+  @@index([patientId, shiftDate])        // Patient handoffs by shift date
+  @@index([shift, shiftDate])            // All handoffs for a shift
+  @@index([authorId, createdAt])         // Author's handoff notes
+  @@index([status])                      // Filter by handoff status
+  @@index([shiftDate, status])           // Pending handoffs for a date
+  @@map("handoff_notes")
+}

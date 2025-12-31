@@ -1,0 +1,42 @@
+node_modules
+
+# Keep environment variables out of version control
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# Database files (may contain PHI)
+*.db
+*.sqlite
+*.sqlite3
+dev.db
+
+# Prisma generated files
+/lib/generated/prisma
+/prisma/migrations/**/migration_lock.toml
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Build output
+.next/
+out/
+build/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -1,0 +1,688 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  /* Dark theme (default) */
+  --bg-primary: #000508;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #1e293b;
+  --bg-card: #0f172a;
+  --bg-hover: #1e293b;
+  --border-color: #334155;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+}
+
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-hover: #e2e8f0;
+  --border-color: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+}
+
+/* Theme transition */
+[data-theme] {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ===========================================
+   LIGHT THEME OVERRIDES
+   =========================================== */
+
+[data-theme="light"] body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .bg-slate-900 {
+  background-color: var(--bg-secondary) !important;
+}
+
+[data-theme="light"] .bg-slate-800 {
+  background-color: var(--bg-tertiary) !important;
+}
+
+[data-theme="light"] .bg-slate-800\/50 {
+  background-color: rgba(241, 245, 249, 0.5) !important;
+}
+
+[data-theme="light"] .bg-black {
+  background-color: var(--bg-primary) !important;
+}
+
+[data-theme="light"] .bg-black\/50,
+[data-theme="light"] .bg-black\/40,
+[data-theme="light"] .bg-black\/30 {
+  background-color: rgba(248, 250, 252, 0.8) !important;
+}
+
+[data-theme="light"] .text-white {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .text-slate-100,
+[data-theme="light"] .text-slate-200,
+[data-theme="light"] .text-slate-300 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .text-slate-400 {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] .text-slate-500,
+[data-theme="light"] .text-slate-600 {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="light"] .border-slate-700,
+[data-theme="light"] .border-slate-800 {
+  border-color: var(--border-color) !important;
+}
+
+/* Navigation in light mode */
+[data-theme="light"] nav {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="light"] nav a,
+[data-theme="light"] nav button {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] nav a:hover,
+[data-theme="light"] nav button:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] nav a.active,
+[data-theme="light"] nav .bg-cyan-500\/10 {
+  background-color: rgba(6, 182, 212, 0.15) !important;
+}
+
+/* Cards in light mode */
+[data-theme="light"] .bg-slate-900\/50 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Header in light mode */
+[data-theme="light"] header {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Scrollbar in light mode */
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Modal backdrop in light mode */
+[data-theme="light"] .bg-black\/70 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+/* Input fields in light mode */
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background-color: var(--bg-tertiary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Keep vital signs colors consistent in both themes */
+[data-theme="light"] .text-cyan-400 { color: #0891b2 !important; }
+[data-theme="light"] .text-green-400 { color: #16a34a !important; }
+[data-theme="light"] .text-yellow-400 { color: #ca8a04 !important; }
+[data-theme="light"] .text-red-400 { color: #dc2626 !important; }
+[data-theme="light"] .text-pink-400 { color: #db2777 !important; }
+[data-theme="light"] .text-emerald-400 { color: #10b981 !important; }
+
+/* Status badges in light mode */
+[data-theme="light"] .bg-red-500\/20 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+[data-theme="light"] .bg-yellow-500\/20 {
+  background-color: rgba(234, 179, 8, 0.15) !important;
+}
+
+[data-theme="light"] .bg-green-500\/20,
+[data-theme="light"] .bg-emerald-500\/20 {
+  background-color: rgba(34, 197, 94, 0.15) !important;
+}
+
+[data-theme="light"] .bg-cyan-500\/20,
+[data-theme="light"] .bg-cyan-500\/10 {
+  background-color: rgba(6, 182, 212, 0.15) !important;
+}
+
+/* Patient monitor cards in light mode - keep dark for contrast */
+[data-theme="light"] .patient-monitor {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .patient-monitor * {
+  color: inherit !important;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--font-sans);
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Ensure monospace font for vitals */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Tabular numbers for vital signs */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+  }
+}
+
+/* Critical patient card glow effect */
+.critical-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Waveform animation smoothing */
+svg path {
+  transition: transform 0.05s linear;
+}
+
+/* Button active states */
+button:active {
+  transform: scale(0.98);
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(34, 211, 238, 0.3);
+  color: white;
+}
+
+/* Toast slide-in animation */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
+/* Modal animation */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modal-in 0.2s ease-out forwards;
+}
+
+/* ===========================================
+   REAL-TIME VITAL SIGNS ANIMATIONS
+   =========================================== */
+
+/* Subtle bounce for trend arrows */
+@keyframes bounce-subtle-up {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes bounce-subtle-down {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+
+.animate-bounce-subtle-up {
+  animation: bounce-subtle-up 1s ease-in-out infinite;
+}
+
+.animate-bounce-subtle-down {
+  animation: bounce-subtle-down 1s ease-in-out infinite;
+}
+
+/* Ping animation for value changes */
+@keyframes ping-once {
+  0% { transform: scale(1); opacity: 0.3; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.animate-ping-once {
+  animation: ping-once 0.5s ease-out forwards;
+}
+
+/* Value flash highlight */
+@keyframes value-flash {
+  0% { background-color: rgba(34, 211, 238, 0.3); }
+  100% { background-color: transparent; }
+}
+
+.animate-value-flash {
+  animation: value-flash 0.5s ease-out forwards;
+}
+
+/* Glow pulse for changing values */
+@keyframes glow-pulse {
+  0%, 100% {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+    transform: scale(1.02);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 0.3s ease-out;
+}
+
+/* Trend indicator fade in */
+@keyframes trend-fade-in {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-trend-in {
+  animation: trend-fade-in 0.2s ease-out forwards;
+}
+
+/* Live update dot animation */
+@keyframes live-dot {
+  0%, 100% { opacity: 0.5; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.animate-live-dot {
+  animation: live-dot 2s ease-in-out infinite;
+}
+
+/* ===========================================
+   PRINT STYLES
+   For Handoff Reports, Patient Summaries, etc.
+   =========================================== */
+
+@media print {
+  /* Reset dark theme to light for printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    background: white !important;
+    color: #1a1a1a !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Hide navigation, headers, and interactive elements */
+  nav,
+  .no-print,
+  header:not(.print-header),
+  button:not(.print-button),
+  input,
+  select,
+  [role="navigation"],
+  .alarm-sound-controls,
+  .toast-container,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  /* Main content takes full width */
+  main, .print-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0.5in !important;
+  }
+
+  /* Reset backgrounds for print */
+  .bg-slate-900,
+  .bg-slate-800,
+  .bg-slate-700,
+  .bg-black,
+  [class*="bg-slate-"] {
+    background: white !important;
+  }
+
+  /* Reset text colors for print */
+  .text-white,
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300,
+  .text-slate-400 {
+    color: #1a1a1a !important;
+  }
+
+  .text-slate-500,
+  .text-slate-600 {
+    color: #4a4a4a !important;
+  }
+
+  /* Keep status colors visible but adjusted for print */
+  .text-red-400, .text-red-500 {
+    color: #dc2626 !important;
+  }
+
+  .text-yellow-400, .text-yellow-500 {
+    color: #ca8a04 !important;
+  }
+
+  .text-green-400, .text-green-500, .text-emerald-400 {
+    color: #16a34a !important;
+  }
+
+  .text-cyan-400, .text-cyan-500 {
+    color: #0891b2 !important;
+  }
+
+  /* Borders for print */
+  .border-slate-700,
+  .border-slate-800,
+  [class*="border-slate-"] {
+    border-color: #d1d5db !important;
+  }
+
+  /* Status badges for print */
+  .bg-red-500\/20, .bg-red-900\/50 {
+    background: #fecaca !important;
+    border: 1px solid #dc2626 !important;
+  }
+
+  .bg-yellow-500\/20, .bg-yellow-900\/30 {
+    background: #fef3c7 !important;
+    border: 1px solid #ca8a04 !important;
+  }
+
+  .bg-green-500\/20, .bg-emerald-500\/20, .bg-emerald-900\/30 {
+    background: #dcfce7 !important;
+    border: 1px solid #16a34a !important;
+  }
+
+  .bg-cyan-500\/20, .bg-cyan-500\/10 {
+    background: #cffafe !important;
+    border: 1px solid #0891b2 !important;
+  }
+
+  /* Table styles for print */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #d1d5db !important;
+    padding: 8px !important;
+    text-align: left !important;
+  }
+
+  th {
+    background: #f3f4f6 !important;
+    font-weight: 600 !important;
+  }
+
+  /* Page breaks */
+  .page-break-before {
+    page-break-before: always !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+  }
+
+  .no-page-break {
+    page-break-inside: avoid !important;
+  }
+
+  /* Patient cards - avoid breaking */
+  .patient-card,
+  .print-section {
+    page-break-inside: avoid !important;
+    margin-bottom: 16px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    background: white !important;
+  }
+
+  /* Print header */
+  .print-header {
+    display: block !important;
+    text-align: center !important;
+    border-bottom: 2px solid #1a1a1a !important;
+    padding-bottom: 16px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .print-header h1 {
+    font-size: 18pt !important;
+    font-weight: 700 !important;
+    color: #1a1a1a !important;
+  }
+
+  .print-header .subtitle {
+    font-size: 10pt !important;
+    color: #4a4a4a !important;
+  }
+
+  /* Print footer */
+  .print-footer {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding: 8px 0.5in !important;
+    border-top: 1px solid #d1d5db !important;
+    font-size: 9pt !important;
+    color: #6b7280 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+  }
+
+  /* Vital signs for print */
+  .vital-value {
+    font-family: var(--font-mono) !important;
+    font-weight: 700 !important;
+    font-size: 12pt !important;
+  }
+
+  .vital-label {
+    font-size: 8pt !important;
+    text-transform: uppercase !important;
+    color: #6b7280 !important;
+  }
+
+  /* Charts - hide animated charts, show print-friendly version */
+  canvas {
+    display: none !important;
+  }
+
+  .chart-print-fallback {
+    display: block !important;
+  }
+
+  /* Handoff specific styles */
+  .handoff-section {
+    margin-bottom: 20px !important;
+  }
+
+  .handoff-section h2 {
+    font-size: 14pt !important;
+    font-weight: 600 !important;
+    border-bottom: 1px solid #d1d5db !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Medication list */
+  .medication-item {
+    padding: 4px 0 !important;
+    border-bottom: 1px dotted #e5e7eb !important;
+  }
+
+  /* Diagnosis tags */
+  .diagnosis-tag {
+    display: inline-block !important;
+    padding: 2px 8px !important;
+    margin: 2px !important;
+    background: #f3f4f6 !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 4px !important;
+    font-size: 9pt !important;
+  }
+
+  /* Links - show URL for print */
+  a[href]:after {
+    content: none !important; /* Don't print URLs */
+  }
+
+  /* Rounded corners - keep for visual hierarchy */
+  .rounded-xl, .rounded-lg, .rounded {
+    border-radius: 4px !important;
+  }
+
+  /* Waveforms and animations - disable */
+  svg:not(.print-icon) {
+    opacity: 0.5 !important;
+  }
+
+  .animate-pulse,
+  .animate-spin,
+  .animate-slide-in,
+  .animate-modal-in,
+  .critical-glow,
+  [class*="animate-"] {
+    animation: none !important;
+  }
+
+  /* Grid adjustments for print */
+  .grid {
+    display: block !important;
+  }
+
+  .grid > * {
+    display: block !important;
+    width: 100% !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Two-column layout for print when needed */
+  .print-two-col {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Signature line for handoff */
+  .signature-line {
+    margin-top: 40px !important;
+    border-top: 1px solid #1a1a1a !important;
+    padding-top: 8px !important;
+  }
+
+  .signature-line label {
+    font-size: 9pt !important;
+    color: #6b7280 !important;
+  }
+}
+
+/* Print button styling (visible on screen) */
+.print-button {
+  cursor: pointer;
+}
+
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
+@media print {
+  .screen-only {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}
