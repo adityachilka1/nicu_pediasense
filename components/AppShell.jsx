@@ -208,8 +208,16 @@ export default function AppShell({ children, showNav = true }) {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
         <header className="h-14 flex-shrink-0 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-sm font-medium text-slate-400">PEDIASENSE NESTWATCH</h1>
+          <div className="flex items-center gap-3">
+            <img
+              src="/branding/nestwatch-final-favicon.svg"
+              alt="NestWatch Logo"
+              className="w-7 h-7 rounded-lg"
+            />
+            <div className="flex items-baseline gap-0.5">
+              <span className="text-sm font-medium text-cyan-400">Nest</span>
+              <span className="text-sm font-medium text-white">Watch</span>
+            </div>
             <span className="text-xs text-slate-600">Floor 3 West • Unit A</span>
           </div>
           

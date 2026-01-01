@@ -20,6 +20,18 @@ const inter = Inter({
 export const metadata = {
   title: 'PEDIASENSE NestWatch | NICU Monitoring',
   description: 'Real-time multi-patient vital signs monitoring dashboard for Neonatal ICU by PEDIASENSE',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/branding/nestwatch-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/branding/nestwatch-64.png', sizes: '64x64', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/branding/nestwatch-128.png', sizes: '128x128' },
+      { url: '/branding/nestwatch-256.png', sizes: '256x256' },
+    ],
+  },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({ children }) {

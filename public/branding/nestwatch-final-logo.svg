@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 100">
+  <defs>
+    <linearGradient id="lbg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0891B2"/>
+      <stop offset="100%" style="stop-color:#0E7490"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Icon -->
+  <g transform="translate(8, 10)">
+    <rect width="80" height="80" rx="18" fill="url(#lbg)"/>
+    
+    <!-- Nest curve -->
+    <path d="M11 47 Q11 69 40 69 Q69 69 69 47" 
+          stroke="#FFF" 
+          stroke-width="7" 
+          stroke-linecap="round"
+          fill="none"/>
+    
+    <!-- Pulse line -->
+    <path d="M14 31 L28 31 L34 20 L40 44 L46 20 L52 31 L66 31" 
+          stroke="#A5F3FC" 
+          stroke-width="4.5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"/>
+  </g>
+  
+  <!-- Wordmark -->
+  <text x="105" y="62" font-family="system-ui, -apple-system, 'SF Pro Display', 'Segoe UI', sans-serif" font-size="38" font-weight="600" fill="#0E7490">
+    <tspan>Nest</tspan><tspan fill="#164E63">Watch</tspan>
+  </text>
+</svg>

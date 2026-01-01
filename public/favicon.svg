@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="fbg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0891B2"/>
+      <stop offset="100%" style="stop-color:#0E7490"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="32" height="32" rx="7" fill="url(#fbg)"/>
+  
+  <!-- Nest curve -->
+  <path d="M4 19 Q4 28 16 28 Q28 28 28 19" 
+        stroke="#FFF" 
+        stroke-width="3" 
+        stroke-linecap="round"
+        fill="none"/>
+  
+  <!-- Pulse line -->
+  <path d="M5 12 L11 12 L14 7 L16 18 L18 7 L21 12 L27 12" 
+        stroke="#A5F3FC" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        fill="none"/>
+</svg>

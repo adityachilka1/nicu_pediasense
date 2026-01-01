@@ -55,11 +55,11 @@ function LoginForm() {
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-cyan-900/20 to-slate-900 flex-col justify-between p-12" aria-hidden="true">
         <div>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
-              <svg className="w-7 h-7 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-              </svg>
-            </div>
+            <img
+              src="/branding/nestwatch-final-favicon.svg"
+              alt="NestWatch Logo"
+              className="w-12 h-12 rounded-xl"
+            />
             <div>
               <h1 className="text-2xl font-bold text-white">PEDIASENSE</h1>
               <p className="text-sm text-slate-400">NestWatch</p>
@@ -102,12 +102,15 @@ function LoginForm() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center" aria-hidden="true">
-              <svg className="w-6 h-6 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-              </svg>
+            <img
+              src="/branding/nestwatch-final-favicon.svg"
+              alt="NestWatch Logo"
+              className="w-10 h-10 rounded-xl"
+            />
+            <div className="flex items-baseline">
+              <span className="text-xl font-bold text-cyan-400">Nest</span>
+              <span className="text-xl font-bold text-white">Watch</span>
             </div>
-            <h1 className="text-xl font-bold text-white">NestWatch</h1>
           </div>
           
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8">

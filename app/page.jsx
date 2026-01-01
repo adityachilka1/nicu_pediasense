@@ -735,13 +735,16 @@ export default function NICUCentralStation() {
         <header className="flex-shrink-0 border-b border-slate-800 bg-slate-900/90 backdrop-blur">
           <div className="flex items-center justify-between px-4 py-2">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded bg-cyan-900/50 border border-cyan-700/50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-              </div>
+              <img
+                src="/branding/nestwatch-final-favicon.svg"
+                alt="NestWatch Logo"
+                className="w-8 h-8 rounded-lg"
+              />
               <div>
-                <h1 className="text-sm font-bold text-white tracking-wide">PEDIASENSE NESTWATCH</h1>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-sm font-bold text-cyan-400 tracking-wide">Nest</span>
+                  <span className="text-sm font-bold text-white tracking-wide">Watch</span>
+                </div>
                 <p className="text-[10px] text-slate-500">Floor 3 West • Unit A</p>
               </div>
             </div>

@@ -277,12 +277,16 @@ export default function Navigation({ alarmCount = 0 }) {
     <nav className="w-16 lg:w-56 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col" aria-label="Main navigation">
       {/* Logo */}
       <div className="h-14 flex items-center justify-center lg:justify-start lg:px-4 border-b border-slate-800">
-        <div className="w-8 h-8 rounded bg-cyan-500/20 flex items-center justify-center" aria-hidden="true">
-          <svg className="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-          </svg>
+        <img
+          src="/branding/nestwatch-final-favicon.svg"
+          alt=""
+          className="w-8 h-8 rounded-lg"
+          aria-hidden="true"
+        />
+        <div className="hidden lg:flex ml-3 items-baseline">
+          <span className="font-bold text-cyan-400 text-sm">Nest</span>
+          <span className="font-bold text-white text-sm">Watch</span>
         </div>
-        <span className="hidden lg:block ml-3 font-bold text-white text-sm">NestWatch</span>
         <span className="lg:hidden sr-only">PEDIASENSE NestWatch</span>
       </div>
       

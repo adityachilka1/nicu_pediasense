@@ -1,0 +1,37 @@
+{
+  "name": "PEDIASENSE NestWatch",
+  "short_name": "NestWatch",
+  "description": "Real-time NICU vital signs monitoring dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000508",
+  "theme_color": "#0891B2",
+  "icons": [
+    {
+      "src": "/branding/nestwatch-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/branding/nestwatch-64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "/branding/nestwatch-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/branding/nestwatch-256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "/branding/nestwatch-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

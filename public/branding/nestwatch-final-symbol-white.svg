@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Nest curve -->
+  <path d="M56 300 Q56 456 256 456 Q456 456 456 300" 
+        stroke="#FFF" 
+        stroke-width="48" 
+        stroke-linecap="round"
+        fill="none"/>
+  
+  <!-- Pulse line -->
+  <path d="M72 188 
+           L168 188 
+           L212 104 
+           L256 280 
+           L300 104 
+           L344 188 
+           L440 188" 
+        stroke="#FFF" 
+        stroke-width="32" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        fill="none"/>
+</svg>
