@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import AppShell from '../../components/AppShell';
+import { useToast } from '@/components/Toast';
 
 const patients = [
   { id: 1, name: 'Baby Thompson', bed: 'BED 01' },
@@ -47,6 +48,10 @@ export default function LabsPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showResultModal, setShowResultModal] = useState(false);
   const [selectedResult, setSelectedResult] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [pendingOrdersList, setPendingOrdersList] = useState(pendingOrders);
+  const [acknowledgedCritical, setAcknowledgedCritical] = useState([]);
+  const toast = useToast();
 
   const filteredResults = labResults.filter(result => {
     if (selectedPatient !== 'all' && result.patient !== selectedPatient) return false;
@@ -88,7 +93,10 @@ export default function LabsPage() {
                 <option key={p.id} value={p.name}>{p.bed} - {p.name}</option>
               ))}
             </select>
-            <button className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600">
+            <button
+              onClick={() => setShowOrderModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
+            >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -186,7 +194,7 @@ export default function LabsPage() {
               }`}
             >
               {tab}
-              {tab === 'pending' && <span className="ml-2 px-1.5 py-0.5 bg-yellow-500/30 rounded text-xs">{pendingOrders.length}</span>}
+              {tab === 'pending' && <span className="ml-2 px-1.5 py-0.5 bg-yellow-500/30 rounded text-xs">{pendingOrdersList.length}</span>}
               {tab === 'critical' && <span className="ml-2 px-1.5 py-0.5 bg-red-500/30 rounded text-xs">{labResults.filter(r => r.critical).length}</span>}
             </button>
           ))}
@@ -263,7 +271,7 @@ export default function LabsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingOrders.map((order) => (
+                  {pendingOrdersList.map((order) => (
                     <tr key={order.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                       <td className="p-4 text-white font-medium">{order.patient}</td>
                       <td className="p-4 text-slate-400">{order.bed}</td>
@@ -278,7 +286,13 @@ export default function LabsPage() {
                       <td className="p-4 text-slate-400">{order.orderedAt}</td>
                       <td className="p-4 text-slate-400">{order.orderedBy}</td>
                       <td className="p-4">
-                        <button className="px-3 py-1 bg-green-500/20 text-green-400 rounded text-sm hover:bg-green-500/30">
+                        <button
+                          onClick={() => {
+                            setPendingOrdersList(pendingOrdersList.filter(o => o.id !== order.id));
+                            toast.success(`${order.test} marked as collected`);
+                          }}
+                          className="px-3 py-1 bg-green-500/20 text-green-400 rounded text-sm hover:bg-green-500/30"
+                        >
                           Mark Collected
                         </button>
                       </td>
@@ -314,7 +328,13 @@ export default function LabsPage() {
                     >
                       View Critical Values
                     </button>
-                    <button className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">
+                    <button
+                      onClick={() => {
+                        setAcknowledgedCritical([...acknowledgedCritical, result.id]);
+                        toast.success('Critical value acknowledged');
+                      }}
+                      className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600"
+                    >
                       Acknowledge
                     </button>
                   </div>
@@ -325,6 +345,63 @@ export default function LabsPage() {
         )}
 
         {/* Result Detail Modal */}
+        {/* Order Labs Modal */}
+        {showOrderModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">Order Laboratory Tests</h3>
+                <button onClick={() => setShowOrderModal(false)} className="text-slate-400 hover:text-white">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">Select Patient</label>
+                  <select className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white">
+                    {patients.map(p => (
+                      <option key={p.id} value={p.id}>{p.bed} - {p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">Select Tests</label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-900 rounded-lg p-3">
+                    {['CBC with Diff', 'BMP', 'CMP', 'ABG', 'VBG', 'Total/Direct Bili', 'CRP', 'Procalcitonin', 'Blood Culture x2', 'Coagulation Panel'].map(test => (
+                      <label key={test} className="flex items-center gap-3 p-2 hover:bg-slate-800 rounded cursor-pointer">
+                        <input type="checkbox" className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-cyan-500" />
+                        <span className="text-white">{test}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">Priority</label>
+                  <select className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white">
+                    <option value="routine">Routine</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="stat">STAT</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6 pt-4 border-t border-slate-700">
+                <button onClick={() => setShowOrderModal(false)} className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600">Cancel</button>
+                <button
+                  onClick={() => {
+                    toast.success('Lab orders submitted successfully');
+                    setShowOrderModal(false);
+                  }}
+                  className="flex-1 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
+                >
+                  Submit Orders
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showResultModal && selectedResult && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700">
@@ -380,7 +457,32 @@ export default function LabsPage() {
                 >
                   Close
                 </button>
-                <button className="flex-1 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600">
+                <button
+                  onClick={() => {
+                    const printContent = `
+                      <html><head><title>Lab Result - ${selectedResult.test}</title>
+                      <style>body{font-family:Arial;padding:20px}h1{color:#0891b2}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ccc;padding:10px;text-align:left}th{background:#f0f0f0}</style>
+                      </head><body>
+                      <h1>Laboratory Result</h1>
+                      <p><strong>Patient:</strong> ${selectedResult.patient} - ${selectedResult.bed}</p>
+                      <p><strong>Test:</strong> ${selectedResult.test}</p>
+                      <p><strong>Collected:</strong> ${selectedResult.collectedAt}</p>
+                      <p><strong>Result Time:</strong> ${selectedResult.resultAt}</p>
+                      <p><strong>Status:</strong> ${selectedResult.status}</p>
+                      <h2>Results</h2>
+                      <table><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>
+                      ${Object.entries(selectedResult.results).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}
+                      </tbody></table>
+                      <p style="margin-top:20px;font-size:12px;color:#666">Printed: ${new Date().toLocaleString()}</p>
+                      </body></html>
+                    `;
+                    const w = window.open('', '_blank');
+                    w.document.write(printContent);
+                    w.document.close();
+                    w.print();
+                  }}
+                  className="flex-1 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
+                >
                   Print Result
                 </button>
               </div>

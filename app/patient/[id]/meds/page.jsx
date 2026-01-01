@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import PatientHeader from '@/components/PatientHeader';
@@ -12,7 +12,167 @@ export default function PatientMedsPage() {
   const params = useParams();
   const patient = initialPatients.find(p => p.id === parseInt(params.id)) || initialPatients[0];
   const [showAddMed, setShowAddMed] = useState(false);
+  const [newMed, setNewMed] = useState({
+    name: '',
+    dose: '',
+    route: 'PO',
+    frequency: 'Daily',
+    indication: ''
+  });
   const toast = useToast();
+  const printRef = useRef(null);
+
+  // Print MAR handler
+  const handlePrintMAR = () => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Medication Administration Record - ${patient.name}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #1a365d; border-bottom: 2px solid #1a365d; padding-bottom: 10px; }
+          .patient-info { margin-bottom: 20px; background: #f0f4f8; padding: 15px; border-radius: 8px; }
+          .patient-info p { margin: 5px 0; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+          th { background: #1a365d; color: white; }
+          tr:nth-child(even) { background: #f8f9fa; }
+          .time-header { text-align: center; background: #e2e8f0 !important; }
+          .status-given { color: green; font-weight: bold; }
+          .status-due { color: orange; font-weight: bold; }
+          .footer { margin-top: 30px; font-size: 12px; color: #666; }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Medication Administration Record (MAR)</h1>
+        <div class="patient-info">
+          <p><strong>Patient:</strong> ${patient.name}</p>
+          <p><strong>MRN:</strong> ${patient.mrn || 'N/A'}</p>
+          <p><strong>Bed:</strong> BED ${String(patient.id).padStart(2, '0')}</p>
+          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+          <p><strong>Weight:</strong> ${patient.weight || 'N/A'} kg</p>
+        </div>
+        <h2>Scheduled Medications</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Medication</th>
+              <th>Dose</th>
+              <th>Route</th>
+              <th>Frequency</th>
+              <th>08:00</th>
+              <th>12:00</th>
+              <th>20:00</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Caffeine Citrate</td>
+              <td>10 mg</td>
+              <td>IV</td>
+              <td>Daily</td>
+              <td class="status-given">✓ Given</td>
+              <td>-</td>
+              <td>-</td>
+            </tr>
+            <tr>
+              <td>Vitamin D</td>
+              <td>400 IU</td>
+              <td>PO</td>
+              <td>Daily</td>
+              <td class="status-given">✓ Given</td>
+              <td>-</td>
+              <td>-</td>
+            </tr>
+            <tr>
+              <td>Iron Supplement</td>
+              <td>2 mg/kg</td>
+              <td>PO</td>
+              <td>Daily</td>
+              <td>-</td>
+              <td class="status-given">✓ Given</td>
+              <td>-</td>
+            </tr>
+            <tr>
+              <td>Ampicillin</td>
+              <td>50 mg/kg</td>
+              <td>IV</td>
+              <td>q12h</td>
+              <td class="status-given">✓ Given</td>
+              <td>-</td>
+              <td class="status-due">○ Due</td>
+            </tr>
+            <tr>
+              <td>Gentamicin</td>
+              <td>4 mg/kg</td>
+              <td>IV</td>
+              <td>q24h</td>
+              <td class="status-given">✓ Given</td>
+              <td>-</td>
+              <td>-</td>
+            </tr>
+          </tbody>
+        </table>
+        <h2>PRN Medications</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Medication</th>
+              <th>Dose</th>
+              <th>Route</th>
+              <th>Indication</th>
+              <th>Last Given</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Acetaminophen</td>
+              <td>15 mg/kg</td>
+              <td>PO/PR</td>
+              <td>Pain/Fever</td>
+              <td>Never</td>
+            </tr>
+            <tr>
+              <td>Simethicone</td>
+              <td>20 mg</td>
+              <td>PO</td>
+              <td>Gas/Colic</td>
+              <td>14:00</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="footer">
+          <p>Printed: ${new Date().toLocaleString()}</p>
+          <p>NICU Central - Medication Administration Record</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
+  // Handle add medication form
+  const handleAddMedication = (e) => {
+    e.preventDefault();
+    if (!newMed.name || !newMed.dose) {
+      toast.error('Please fill in medication name and dose');
+      return;
+    }
+    toast.success(`${newMed.name} added to medication list`);
+    setShowAddMed(false);
+    setNewMed({ name: '', dose: '', route: 'PO', frequency: 'Daily', indication: '' });
+  };
   
   const medications = [
     { 
@@ -109,7 +269,13 @@ export default function PatientMedsPage() {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-white">Medications</h2>
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors">
+            <button
+              onClick={handlePrintMAR}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
               Print MAR
             </button>
             <button 
@@ -276,6 +442,128 @@ export default function PatientMedsPage() {
             </div>
           </div>
         </div>
+
+        {/* Add Medication Modal */}
+        {showAddMed && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">Add New Medication</h3>
+                <button
+                  onClick={() => setShowAddMed(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={handleAddMedication} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Medication Name *</label>
+                  <input
+                    type="text"
+                    value={newMed.name}
+                    onChange={(e) => setNewMed({...newMed, name: e.target.value})}
+                    placeholder="e.g., Caffeine Citrate"
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Dose *</label>
+                    <input
+                      type="text"
+                      value={newMed.dose}
+                      onChange={(e) => setNewMed({...newMed, dose: e.target.value})}
+                      placeholder="e.g., 10 mg"
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Route</label>
+                    <select
+                      value={newMed.route}
+                      onChange={(e) => setNewMed({...newMed, route: e.target.value})}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    >
+                      <option value="PO">PO (Oral)</option>
+                      <option value="IV">IV (Intravenous)</option>
+                      <option value="IV Push">IV Push</option>
+                      <option value="IV Drip">IV Drip</option>
+                      <option value="IM">IM (Intramuscular)</option>
+                      <option value="SQ">SQ (Subcutaneous)</option>
+                      <option value="PR">PR (Rectal)</option>
+                      <option value="INH">INH (Inhalation)</option>
+                      <option value="TOP">TOP (Topical)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Frequency</label>
+                    <select
+                      value={newMed.frequency}
+                      onChange={(e) => setNewMed({...newMed, frequency: e.target.value})}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    >
+                      <option value="Daily">Daily</option>
+                      <option value="BID">BID (Twice daily)</option>
+                      <option value="TID">TID (Three times daily)</option>
+                      <option value="QID">QID (Four times daily)</option>
+                      <option value="q4h">q4h (Every 4 hours)</option>
+                      <option value="q6h">q6h (Every 6 hours)</option>
+                      <option value="q8h">q8h (Every 8 hours)</option>
+                      <option value="q12h">q12h (Every 12 hours)</option>
+                      <option value="q24h">q24h (Every 24 hours)</option>
+                      <option value="PRN">PRN (As needed)</option>
+                      <option value="Continuous">Continuous</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Indication</label>
+                    <input
+                      type="text"
+                      value={newMed.indication}
+                      onChange={(e) => setNewMed({...newMed, indication: e.target.value})}
+                      placeholder="e.g., Apnea of prematurity"
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <svg className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="text-sm text-yellow-400">New medication orders require physician approval</span>
+                </div>
+
+                <div className="flex gap-3 mt-6 pt-4 border-t border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddMed(false)}
+                    className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Medication
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );

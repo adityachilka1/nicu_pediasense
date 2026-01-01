@@ -12,6 +12,9 @@ export default function PatientTimelinePage() {
   const params = useParams();
   const patient = initialPatients.find(p => p.id === parseInt(params.id)) || initialPatients[0];
   const [filter, setFilter] = useState('all');
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showAddendumModal, setShowAddendumModal] = useState(false);
+  const [addendumText, setAddendumText] = useState('');
   const toast = useToast();
   
   const events = [
@@ -125,9 +128,22 @@ export default function PatientTimelinePage() {
                     <div className="flex items-center justify-between pt-2 border-t border-slate-800">
                       <span className="text-xs text-slate-500">{event.user}</span>
                       <div className="flex items-center gap-2">
-                        <button className="text-xs text-cyan-400 hover:text-cyan-300">View Details</button>
+                        <button
+                          onClick={() => setSelectedEvent(event)}
+                          className="text-xs text-cyan-400 hover:text-cyan-300"
+                        >
+                          View Details
+                        </button>
                         {event.type === 'note' && (
-                          <button className="text-xs text-cyan-400 hover:text-cyan-300">Add Addendum</button>
+                          <button
+                            onClick={() => {
+                              setSelectedEvent(event);
+                              setShowAddendumModal(true);
+                            }}
+                            className="text-xs text-cyan-400 hover:text-cyan-300"
+                          >
+                            Add Addendum
+                          </button>
                         )}
                       </div>
                     </div>
@@ -147,6 +163,193 @@ export default function PatientTimelinePage() {
             Load More Events
           </button>
         </div>
+
+        {/* Event Detail Modal */}
+        {selectedEvent && !showAddendumModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <span className={`w-3 h-3 rounded-full ${getEventColor(selectedEvent.type)}`} />
+                  <h3 className="text-lg font-semibold text-white">{selectedEvent.title}</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-slate-900 rounded-lg p-4">
+                  <p className="text-slate-300">{selectedEvent.desc}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-900 rounded-lg p-3">
+                    <div className="text-xs text-slate-500 mb-1">Date & Time</div>
+                    <div className="text-white font-medium">
+                      {new Date(selectedEvent.time).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 rounded-lg p-3">
+                    <div className="text-xs text-slate-500 mb-1">Documented By</div>
+                    <div className="text-white font-medium">{selectedEvent.user}</div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <div className="text-xs text-slate-500 mb-1">Event Type</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${getEventColor(selectedEvent.type)}`} />
+                    <span className="text-white font-medium capitalize">{selectedEvent.type}</span>
+                  </div>
+                </div>
+
+                {selectedEvent.type === 'vitals' && (
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <div className="text-xs text-slate-500 mb-2">Vital Signs Breakdown</div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Heart Rate:</span>
+                        <span className="text-cyan-400 font-mono">145 bpm</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Resp Rate:</span>
+                        <span className="text-yellow-400 font-mono">42 /min</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">SpO2:</span>
+                        <span className="text-cyan-400 font-mono">96%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Temperature:</span>
+                        <span className="text-pink-400 font-mono">36.8°C</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedEvent.type === 'lab' && (
+                  <div className="bg-slate-900 rounded-lg p-4">
+                    <div className="text-xs text-slate-500 mb-2">Lab Results</div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">WBC:</span>
+                        <span className="text-white font-mono">12.5 K/uL</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Hemoglobin:</span>
+                        <span className="text-white font-mono">14.2 g/dL</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Platelets:</span>
+                        <span className="text-white font-mono">185 K/uL</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6 pt-4 border-t border-slate-700">
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600"
+                >
+                  Close
+                </button>
+                {selectedEvent.type === 'note' && (
+                  <button
+                    onClick={() => setShowAddendumModal(true)}
+                    className="flex-1 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500"
+                  >
+                    Add Addendum
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Addendum Modal */}
+        {showAddendumModal && selectedEvent && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white">Add Addendum</h3>
+                <button
+                  onClick={() => {
+                    setShowAddendumModal(false);
+                    setAddendumText('');
+                  }}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <div className="text-xs text-slate-500 mb-1">Original Note</div>
+                  <p className="text-slate-300 text-sm">{selectedEvent.desc}</p>
+                  <div className="text-xs text-slate-500 mt-2">
+                    {selectedEvent.user} • {new Date(selectedEvent.time).toLocaleString()}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">Addendum Text</label>
+                  <textarea
+                    value={addendumText}
+                    onChange={(e) => setAddendumText(e.target.value)}
+                    placeholder="Enter your addendum..."
+                    rows={4}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white resize-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <svg className="w-5 h-5 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="text-sm text-yellow-400">Addendums are permanently added to the medical record</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6 pt-4 border-t border-slate-700">
+                <button
+                  onClick={() => {
+                    setShowAddendumModal(false);
+                    setAddendumText('');
+                  }}
+                  className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!addendumText.trim()) {
+                      toast.error('Please enter addendum text');
+                      return;
+                    }
+                    toast.success('Addendum added successfully');
+                    setShowAddendumModal(false);
+                    setSelectedEvent(null);
+                    setAddendumText('');
+                  }}
+                  className="flex-1 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500"
+                >
+                  Save Addendum
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );
