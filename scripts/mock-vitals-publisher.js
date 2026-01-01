@@ -33,15 +33,16 @@ const CONFIG = {
 };
 
 // Patient base data (matching your existing mock data structure)
+// BP values based on gestational age - MAP should roughly equal GA in weeks
 const PATIENTS = [
-  { id: 1, name: 'Baby Smith', ga: 28, baseSPO2: 94, basePR: 155, baseRR: 48, baseTemp: 36.8 },
-  { id: 2, name: 'Baby Johnson', ga: 32, baseSPO2: 96, basePR: 145, baseRR: 42, baseTemp: 36.9 },
-  { id: 3, name: 'Baby Williams', ga: 26, baseSPO2: 92, basePR: 160, baseRR: 52, baseTemp: 36.7 },
-  { id: 4, name: 'Baby Brown', ga: 34, baseSPO2: 97, basePR: 140, baseRR: 38, baseTemp: 37.0 },
-  { id: 5, name: 'Baby Davis', ga: 30, baseSPO2: 95, basePR: 150, baseRR: 45, baseTemp: 36.8 },
-  { id: 6, name: 'Baby Miller', ga: 29, baseSPO2: 93, basePR: 158, baseRR: 50, baseTemp: 36.6 },
-  { id: 7, name: 'Baby Wilson', ga: 33, baseSPO2: 96, basePR: 142, baseRR: 40, baseTemp: 36.9 },
-  { id: 8, name: 'Baby Taylor', ga: 27, baseSPO2: 91, basePR: 162, baseRR: 55, baseTemp: 36.7 },
+  { id: 1, name: 'Baby Smith', ga: 28, baseSPO2: 94, basePR: 155, baseRR: 48, baseTemp: 36.8, baseSystolic: 48, baseDiastolic: 26 },
+  { id: 2, name: 'Baby Johnson', ga: 32, baseSPO2: 96, basePR: 145, baseRR: 42, baseTemp: 36.9, baseSystolic: 55, baseDiastolic: 32 },
+  { id: 3, name: 'Baby Williams', ga: 26, baseSPO2: 92, basePR: 160, baseRR: 52, baseTemp: 36.7, baseSystolic: 45, baseDiastolic: 24 },
+  { id: 4, name: 'Baby Brown', ga: 34, baseSPO2: 97, basePR: 140, baseRR: 38, baseTemp: 37.0, baseSystolic: 58, baseDiastolic: 35 },
+  { id: 5, name: 'Baby Davis', ga: 30, baseSPO2: 95, basePR: 150, baseRR: 45, baseTemp: 36.8, baseSystolic: 52, baseDiastolic: 30 },
+  { id: 6, name: 'Baby Miller', ga: 29, baseSPO2: 93, basePR: 158, baseRR: 50, baseTemp: 36.6, baseSystolic: 50, baseDiastolic: 28 },
+  { id: 7, name: 'Baby Wilson', ga: 33, baseSPO2: 96, basePR: 142, baseRR: 40, baseTemp: 36.9, baseSystolic: 56, baseDiastolic: 33 },
+  { id: 8, name: 'Baby Taylor', ga: 27, baseSPO2: 91, basePR: 162, baseRR: 55, baseTemp: 36.7, baseSystolic: 46, baseDiastolic: 25 },
 ];
 
 // Alarm limits per gestational age category
@@ -51,12 +52,14 @@ const ALARM_LIMITS = {
     pr: [100, 180],
     rr: [25, 70],
     temp: [36.0, 38.0],
+    map: [24, 40], // MAP should be >= GA in weeks
   },
   latePreterm: { // 32-37 weeks
     spo2: [88, 98],
     pr: [100, 170],
     rr: [25, 60],
     temp: [36.5, 37.5],
+    map: [30, 50],
   },
 };
 
@@ -70,6 +73,8 @@ PATIENTS.forEach(patient => {
     pr: patient.basePR,
     rr: patient.baseRR,
     temp: patient.baseTemp,
+    systolic: patient.baseSystolic,
+    diastolic: patient.baseDiastolic,
     fio2: patient.ga < 30 ? 30 : 21,
     pi: 1.5 + Math.random() * 2,
     // Track alarm state
@@ -80,6 +85,8 @@ PATIENTS.forEach(patient => {
       pr: 0,
       rr: 0,
       temp: 0,
+      systolic: 0,
+      diastolic: 0,
     },
   };
 });
@@ -148,6 +155,34 @@ function createPayload(value, unit, options = {}) {
 }
 
 /**
+ * Generate blood pressure values (systolic, diastolic, MAP)
+ * MAP = Diastolic + 1/3(Systolic - Diastolic)
+ */
+function generateBloodPressure(patientId, patient, limits) {
+  const state = patientState[patientId];
+
+  // Generate systolic with random walk
+  const systolic = generateVital(patientId, 'systolic', patient.baseSystolic, 4, [30, 70]);
+  // Diastolic follows systolic but with less variance
+  const diastolic = generateVital(patientId, 'diastolic', patient.baseDiastolic, 3, [20, 50]);
+
+  // Calculate MAP: Diastolic + 1/3(Systolic - Diastolic)
+  const map = Math.round(diastolic.value + (systolic.value - diastolic.value) / 3);
+
+  // Check MAP alarm state (MAP should be >= GA in weeks for neonates)
+  let mapAlarmState = 'normal';
+  if (map < limits.map[0]) mapAlarmState = 'low';
+  else if (map > limits.map[1]) mapAlarmState = 'high';
+
+  return {
+    systolic: Math.round(systolic.value),
+    diastolic: Math.round(diastolic.value),
+    map,
+    alarmState: mapAlarmState,
+  };
+}
+
+/**
  * Publish vitals for all patients
  */
 function publishVitals(client) {
@@ -160,6 +195,7 @@ function publishVitals(client) {
     const pr = generateVital(patient.id, 'pr', patient.basePR, 8, limits.pr);
     const rr = generateVital(patient.id, 'rr', patient.baseRR, 5, limits.rr);
     const temp = generateVital(patient.id, 'temp', patient.baseTemp, 0.3, limits.temp);
+    const bp = generateBloodPressure(patient.id, patient, limits);
 
     // Update PI slowly
     state.pi = Math.max(0.5, Math.min(5.0, state.pi + (Math.random() - 0.5) * 0.1));
@@ -177,6 +213,8 @@ function publishVitals(client) {
       { type: 'temperature', value: temp.value, unit: '°C', alarmState: temp.alarmState },
       { type: 'fio2', value: state.fio2, unit: '%', alarmState: 'normal' },
       { type: 'pi', value: Math.round(state.pi * 10) / 10, unit: '%', alarmState: 'normal' },
+      { type: 'bp', value: { systolic: bp.systolic, diastolic: bp.diastolic, map: bp.map }, unit: 'mmHg', alarmState: bp.alarmState },
+      { type: 'blood_pressure', value: { systolic: bp.systolic, diastolic: bp.diastolic, map: bp.map }, unit: 'mmHg', alarmState: bp.alarmState },
     ];
 
     vitals.forEach(({ type, value, unit, alarmState }) => {
@@ -189,7 +227,7 @@ function publishVitals(client) {
     });
 
     // Publish alarms if any vital is out of range
-    const hasAlarm = [spo2, pr, rr, temp].some(v => v.alarmState !== 'normal');
+    const hasAlarm = [spo2, pr, rr, temp, bp].some(v => v.alarmState !== 'normal');
     if (hasAlarm) {
       const alarmTopic = `nicu/${CONFIG.unitId}/patient/${patient.id}/alarms/vital`;
       const alarmPayload = JSON.stringify({
@@ -200,6 +238,7 @@ function publishVitals(client) {
           pr.alarmState !== 'normal' && { type: 'pr', state: pr.alarmState, value: Math.round(pr.value) },
           rr.alarmState !== 'normal' && { type: 'rr', state: rr.alarmState, value: Math.round(rr.value) },
           temp.alarmState !== 'normal' && { type: 'temp', state: temp.alarmState, value: temp.value },
+          bp.alarmState !== 'normal' && { type: 'bp', state: bp.alarmState, value: `${bp.systolic}/${bp.diastolic} (${bp.map})` },
         ].filter(Boolean),
       });
       client.publish(alarmTopic, alarmPayload, { qos: 2 });

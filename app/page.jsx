@@ -656,6 +656,7 @@ export default function NICUCentralStation() {
           ...(mqttData.temp !== undefined && { temp: mqttData.temp, tempTrend: mqttData.tempTrend, tempChanged: mqttData.tempChanged }),
           ...(mqttData.fio2 !== undefined && { fio2: mqttData.fio2 }),
           ...(mqttData.pi !== undefined && { pi: mqttData.pi }),
+          ...(mqttData.bp !== undefined && { bp: mqttData.bp, bpTrend: mqttData.bpTrend, bpChanged: mqttData.bpChanged }),
           source: 'mqtt',
           timestamp: mqttData.timestamp,
         };

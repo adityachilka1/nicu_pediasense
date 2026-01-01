@@ -44,7 +44,12 @@ export function MQTTVitalsProvider({ children, unitId = 'unit-a' }) {
     rr: 'rr',
     fio2: 'fio2',
     pi: 'pi',
+    bp: 'bp',
+    blood_pressure: 'bp',
   };
+
+  // Vital types that are objects (not simple values)
+  const objectVitalTypes = ['bp', 'blood_pressure'];
 
   // Handle incoming MQTT messages
   const handleMessage = useCallback((topic, payload) => {
@@ -61,12 +66,38 @@ export function MQTTVitalsProvider({ children, unitId = 'unit-a' }) {
       if (parsed.dataType === 'vitals') {
         const patientId = parseInt(parsed.patientId);
         const stateKey = vitalTypeMap[parsed.subType] || parsed.subType;
+        const isObjectType = objectVitalTypes.includes(parsed.subType);
 
         setVitalsMap(prev => {
           const prevPatient = prev[patientId] || {};
           const prevValue = prevPatient[stateKey];
 
-          // Calculate trend
+          // For object types (like BP), store the whole object
+          if (isObjectType) {
+            // Calculate trend based on MAP for blood pressure
+            let trend = 'stable';
+            if (prevValue?.map !== undefined && data.value?.map !== undefined) {
+              const diff = data.value.map - prevValue.map;
+              if (Math.abs(diff) >= 3) {
+                trend = diff > 0 ? 'up' : 'down';
+              }
+            }
+
+            return {
+              ...prev,
+              [patientId]: {
+                ...prevPatient,
+                [stateKey]: data.value, // { systolic, diastolic, map }
+                [`${stateKey}Trend`]: trend,
+                [`${stateKey}Changed`]: prevValue?.map !== undefined && Math.abs((data.value?.map || 0) - (prevValue?.map || 0)) >= 3,
+                [`${stateKey}Raw`]: data,
+                timestamp: Date.now(),
+                source: 'mqtt',
+              },
+            };
+          }
+
+          // Calculate trend for simple values
           let trend = 'stable';
           if (prevValue !== undefined && prevValue !== null) {
             const diff = data.value - prevValue;
