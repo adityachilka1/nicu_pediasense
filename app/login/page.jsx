@@ -61,8 +61,8 @@ function LoginForm() {
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">NICU Central</h1>
-              <p className="text-sm text-slate-400">Monitoring Station</p>
+              <h1 className="text-2xl font-bold text-white">PEDIASENSE</h1>
+              <p className="text-sm text-slate-400">NestWatch</p>
             </div>
           </div>
         </div>
@@ -94,7 +94,7 @@ function LoginForm() {
         </div>
         
         <div className="text-sm text-slate-500">
-          © 2024 NICU Central. IEC 60601-1-8 Compliant.
+          © 2024 PEDIASENSE NestWatch. IEC 60601-1-8 Compliant.
         </div>
       </div>
       
@@ -107,7 +107,7 @@ function LoginForm() {
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-white">NICU Central</h1>
+            <h1 className="text-xl font-bold text-white">NestWatch</h1>
           </div>
           
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8">

@@ -13,7 +13,7 @@ import { TrendArrow, SimulationToggle } from '@/components/VitalIndicators';
 import { COLORS } from '@/lib/data';
 
 /*
- * NICU Central Monitoring Station v2
+ * PEDIASENSE NestWatch v2
  * Accurate to industry standards:
  * - IEC 60601-1-8 color coding
  * - Philips IntelliVue / GE CARESCAPE layout conventions
@@ -741,7 +741,7 @@ export default function NICUCentralStation() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-sm font-bold text-white tracking-wide">NICU CENTRAL STATION</h1>
+                <h1 className="text-sm font-bold text-white tracking-wide">PEDIASENSE NESTWATCH</h1>
                 <p className="text-[10px] text-slate-500">Floor 3 West • Unit A</p>
               </div>
             </div>

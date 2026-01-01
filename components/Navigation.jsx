@@ -282,8 +282,8 @@ export default function Navigation({ alarmCount = 0 }) {
             <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
           </svg>
         </div>
-        <span className="hidden lg:block ml-3 font-bold text-white text-sm">NICU Central</span>
-        <span className="lg:hidden sr-only">NICU Central</span>
+        <span className="hidden lg:block ml-3 font-bold text-white text-sm">NestWatch</span>
+        <span className="lg:hidden sr-only">PEDIASENSE NestWatch</span>
       </div>
       
       {/* Main Nav Items */}

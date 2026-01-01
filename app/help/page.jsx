@@ -64,7 +64,7 @@ export default function HelpPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-white">Help & Documentation</h1>
-            <p className="text-sm text-slate-400 mt-1">NICU Central Monitor User Guide v4.2</p>
+            <p className="text-sm text-slate-400 mt-1">PEDIASENSE NestWatch User Guide v4.2</p>
           </div>
         </div>
         
@@ -122,7 +122,7 @@ export default function HelpPage() {
             {activeSection === 'getting-started' && (
               <div className="space-y-6">
                 <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">Welcome to NICU Central Monitor</h2>
+                  <h2 className="text-xl font-bold text-white mb-4">Welcome to PEDIASENSE NestWatch</h2>
                   <p className="text-slate-300 mb-4">
                     This system provides real-time monitoring of vital signs for all patients in your unit. 
                     The central station displays SpO2, heart rate, respiratory rate, and temperature for up to 12 beds simultaneously.
@@ -345,7 +345,7 @@ export default function HelpPage() {
                 <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
                   <h2 className="text-xl font-bold text-white mb-4">Clinical Documentation</h2>
                   <p className="text-slate-300 mb-6">
-                    The NICU Central Monitor integrates with your EMR system to streamline clinical documentation.
+                    PEDIASENSE NestWatch integrates with your EMR system to streamline clinical documentation.
                     All vital signs, events, and interventions can be automatically captured and documented.
                   </p>
 
@@ -447,7 +447,7 @@ export default function HelpPage() {
                 <div className="bg-slate-900 rounded-xl border border-slate-800 p-6">
                   <h2 className="text-xl font-bold text-white mb-4">Connected Devices</h2>
                   <p className="text-slate-300 mb-6">
-                    The NICU Central Monitor connects to bedside monitors and medical devices throughout the unit.
+                    PEDIASENSE NestWatch connects to bedside monitors and medical devices throughout the unit.
                     Understanding device connectivity helps ensure reliable patient monitoring.
                   </p>
 

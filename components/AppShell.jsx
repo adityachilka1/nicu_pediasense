@@ -209,7 +209,7 @@ export default function AppShell({ children, showNav = true }) {
         {/* Top Header */}
         <header className="h-14 flex-shrink-0 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between px-4">
           <div className="flex items-center gap-4">
-            <h1 className="text-sm font-medium text-slate-400">NICU CENTRAL STATION</h1>
+            <h1 className="text-sm font-medium text-slate-400">PEDIASENSE NESTWATCH</h1>
             <span className="text-xs text-slate-600">Floor 3 West • Unit A</span>
           </div>
           

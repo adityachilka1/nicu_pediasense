@@ -147,7 +147,7 @@ export default function PatientMedsPage() {
         </table>
         <div class="footer">
           <p>Printed: ${new Date().toLocaleString()}</p>
-          <p>NICU Central - Medication Administration Record</p>
+          <p>PEDIASENSE NestWatch - Medication Administration Record</p>
         </div>
       </body>
       </html>

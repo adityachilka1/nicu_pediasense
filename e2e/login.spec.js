@@ -37,7 +37,7 @@ test.describe('Login Page', () => {
     // Set viewport to desktop size
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    await expect(page.getByRole('heading', { name: 'NICU Central' }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /PEDIASENSE|NestWatch/i }).first()).toBeVisible();
     await expect(page.getByText('Real-time monitoring')).toBeVisible();
     // Check for capacity stat - use exact match for the label
     await expect(page.getByText('Bed Capacity', { exact: true })).toBeVisible();

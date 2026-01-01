@@ -18,8 +18,8 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: 'NICU Central Monitor | Neonatal Intensive Care',
-  description: 'Real-time multi-patient vital signs monitoring dashboard for Neonatal ICU',
+  title: 'PEDIASENSE NestWatch | NICU Monitoring',
+  description: 'Real-time multi-patient vital signs monitoring dashboard for Neonatal ICU by PEDIASENSE',
 };
 
 export default function RootLayout({ children }) {
