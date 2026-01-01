@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense, useCallback } from 'react';
+import { useState, useEffect, useRef, Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { initialPatients, COLORS } from '@/lib/data';
+import { useMQTTVitals, MQTT_STATUS } from '@/context/MQTTVitalsContext';
 
 // Real-time update interval in milliseconds
 const REALTIME_INTERVAL = 2000;
@@ -297,6 +298,14 @@ function TrendsContent() {
   const [updateCount, setUpdateCount] = useState(0);
   const lastValuesRef = useRef({ spo2: null, pr: null, rr: null, temp: null });
 
+  // Get MQTT vitals for real-time updates
+  const {
+    vitalsMap: mqttVitalsMap,
+    connectionStatus: mqttStatus,
+    isConnected: mqttConnected,
+    messageCount: mqttMessageCount,
+  } = useMQTTVitals();
+
   const handleExportData = () => {
     // Prepare CSV data
     const headers = ['Time', 'SpO2 (%)', 'Pulse Rate (bpm)', 'Respiratory Rate (/min)', 'Temperature (°C)'];
@@ -408,9 +417,43 @@ function TrendsContent() {
     setUpdateCount(0);
   }, [selectedPatient, timeRange]);
 
-  // Real-time update effect
+  // Integrate MQTT data into trends when connected
   useEffect(() => {
-    if (!isLive) return;
+    if (!mqttConnected || !isLive) return;
+
+    const mqttData = mqttVitalsMap[selectedPatient.id];
+    if (!mqttData) return;
+
+    const hours = timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : timeRange === '24h' ? 24 : 72;
+    const maxPoints = hours * 30;
+
+    // Only add if we have actual MQTT values
+    if (mqttData.spo2 !== undefined || mqttData.pr !== undefined || mqttData.rr !== undefined || mqttData.temp !== undefined) {
+      setTrendData(prev => {
+        const now = new Date().toISOString();
+        return {
+          spo2: mqttData.spo2 !== undefined
+            ? [...(prev.spo2 || []).slice(-maxPoints + 1), { time: now, value: mqttData.spo2 }]
+            : prev.spo2,
+          pr: mqttData.pr !== undefined
+            ? [...(prev.pr || []).slice(-maxPoints + 1), { time: now, value: mqttData.pr }]
+            : prev.pr,
+          rr: mqttData.rr !== undefined
+            ? [...(prev.rr || []).slice(-maxPoints + 1), { time: now, value: mqttData.rr }]
+            : prev.rr,
+          temp: mqttData.temp !== undefined
+            ? [...(prev.temp || []).slice(-maxPoints + 1), { time: now, value: mqttData.temp }]
+            : prev.temp,
+        };
+      });
+      setLastUpdate(new Date());
+      setUpdateCount(c => c + 1);
+    }
+  }, [mqttVitalsMap, mqttConnected, isLive, selectedPatient.id, timeRange]);
+
+  // Real-time update effect (fallback when MQTT is not connected)
+  useEffect(() => {
+    if (!isLive || mqttConnected) return; // Skip if MQTT is providing data
 
     setLastUpdate(new Date()); // Set initial time on client only
 
@@ -444,7 +487,7 @@ function TrendsContent() {
     }, REALTIME_INTERVAL);
 
     return () => clearInterval(interval);
-  }, [isLive, timeRange, selectedPatient, generateNewPoint]);
+  }, [isLive, timeRange, selectedPatient, generateNewPoint, mqttConnected]);
   
   // Calculate stats
   const calcStats = (data) => {
@@ -468,11 +511,13 @@ function TrendsContent() {
               {/* Live Indicator */}
               <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${
                 isLive
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/50'
+                  ? mqttConnected
+                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50'
+                    : 'bg-red-500/20 text-red-400 border border-red-500/50'
                   : 'bg-slate-700 text-slate-400 border border-slate-600'
               }`}>
-                <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`} />
-                {isLive ? 'LIVE' : 'PAUSED'}
+                <span className={`w-2 h-2 rounded-full ${isLive ? (mqttConnected ? 'bg-cyan-500' : 'bg-red-500') + ' animate-pulse' : 'bg-slate-500'}`} />
+                {isLive ? (mqttConnected ? 'MQTT LIVE' : 'LIVE') : 'PAUSED'}
               </div>
             </div>
             <p className="text-sm text-slate-400 mt-1">

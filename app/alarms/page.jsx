@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { formatTimeAgo } from '@/lib/data';
 import { useToast } from '@/components/Toast';
 import { useVitals } from '@/context/VitalsContext';
+import { useMQTTVitals, MQTT_STATUS } from '@/context/MQTTVitalsContext';
 
 // Fallback alarm data for demo mode
 const fallbackAlarms = [
@@ -17,6 +18,14 @@ const fallbackAlarms = [
 export default function AlarmsPage() {
   const toast = useToast();
   const { patients } = useVitals();
+  const {
+    alarmsQueue: mqttAlarms,
+    connectionStatus: mqttStatus,
+    isConnected: mqttConnected,
+    acknowledgeAlarm: mqttAcknowledge,
+    clearAlarms: mqttClearAlarms,
+  } = useMQTTVitals();
+
   const [activeTab, setActiveTab] = useState('active');
   const [selectedBed, setSelectedBed] = useState('all');
   const [alarms, setAlarms] = useState([]);
@@ -90,6 +99,39 @@ export default function AlarmsPage() {
     return () => clearInterval(interval);
   }, [fetchAlarms]);
 
+  // Merge MQTT alarms with API alarms
+  const mergedAlarms = useMemo(() => {
+    if (!mqttConnected || mqttAlarms.length === 0) {
+      return alarms;
+    }
+
+    // Transform MQTT alarms to match the expected format
+    const transformedMqttAlarms = mqttAlarms.map(mqttAlarm => {
+      const patient = patients.find(p => p.id === mqttAlarm.patientId);
+      return {
+        id: mqttAlarm.id,
+        bed: patient?.bed || '--',
+        type: mqttAlarm.severity || 'warning',
+        param: mqttAlarm.parameter || 'Unknown',
+        value: mqttAlarm.value,
+        threshold: mqttAlarm.threshold || '--',
+        time: mqttAlarm.receivedAt || new Date(),
+        acknowledged: mqttAlarm.acknowledged || false,
+        patient: patient?.name || 'Unknown',
+        source: 'mqtt',
+      };
+    });
+
+    // Combine and deduplicate by id
+    const combined = [...transformedMqttAlarms, ...alarms];
+    const seen = new Set();
+    return combined.filter(alarm => {
+      if (seen.has(alarm.id)) return false;
+      seen.add(alarm.id);
+      return true;
+    }).sort((a, b) => new Date(b.time) - new Date(a.time));
+  }, [alarms, mqttAlarms, mqttConnected, patients]);
+
   const handleAcknowledge = (alarmId) => {
     setAlarms(prev => prev.map(a =>
       a.id === alarmId ? { ...a, acknowledged: true, acknowledgedBy: 'Current User' } : a
@@ -106,8 +148,8 @@ export default function AlarmsPage() {
     ));
   };
 
-  const activeAlarms = alarms.filter(a => !a.acknowledged);
-  const acknowledgedAlarms = alarms.filter(a => a.acknowledged);
+  const activeAlarms = mergedAlarms.filter(a => !a.acknowledged);
+  const acknowledgedAlarms = mergedAlarms.filter(a => a.acknowledged);
   
   const displayAlarms = activeTab === 'active' ? activeAlarms : acknowledgedAlarms;
   const filteredAlarms = selectedBed === 'all' 
@@ -147,8 +189,9 @@ export default function AlarmsPage() {
             <h1 className="text-2xl font-bold text-white">Alarm Management</h1>
             <p className="text-sm text-slate-400 mt-1">
               {activeAlarms.length} active alarm{activeAlarms.length !== 1 ? 's' : ''}
-              {dataSource === 'api' && <span className="ml-2 text-emerald-400">● Live Data</span>}
-              {dataSource === 'demo' && <span className="ml-2 text-yellow-400">● Demo Mode</span>}
+              {mqttConnected && <span className="ml-2 text-cyan-400">● MQTT Live</span>}
+              {!mqttConnected && dataSource === 'api' && <span className="ml-2 text-emerald-400">● Live Data</span>}
+              {!mqttConnected && dataSource === 'demo' && <span className="ml-2 text-yellow-400">● Demo Mode</span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -174,7 +217,7 @@ export default function AlarmsPage() {
               <div>
                 <div className="text-xs text-red-400 mb-1">CRITICAL</div>
                 <div className="font-mono font-bold text-3xl text-red-400">
-                  {alarms.filter(a => a.type === 'critical' && !a.acknowledged).length}
+                  {mergedAlarms.filter(a => a.type === 'critical' && !a.acknowledged).length}
                 </div>
               </div>
               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -190,7 +233,7 @@ export default function AlarmsPage() {
               <div>
                 <div className="text-xs text-yellow-400 mb-1">WARNING</div>
                 <div className="font-mono font-bold text-3xl text-yellow-400">
-                  {alarms.filter(a => a.type === 'warning' && !a.acknowledged).length}
+                  {mergedAlarms.filter(a => a.type === 'warning' && !a.acknowledged).length}
                 </div>
               </div>
               <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
@@ -206,7 +249,7 @@ export default function AlarmsPage() {
               <div>
                 <div className="text-xs text-orange-400 mb-1">A/B EVENTS</div>
                 <div className="font-mono font-bold text-3xl text-orange-400">
-                  {alarms.filter(a => (a.type === 'apnea' || a.type === 'brady') && !a.acknowledged).length}
+                  {mergedAlarms.filter(a => (a.type === 'apnea' || a.type === 'brady') && !a.acknowledged).length}
                 </div>
               </div>
               <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">

@@ -8,6 +8,7 @@ import { AlarmSoundControls, useAlarmSound } from './AlarmSound';
 import { ThemeToggle } from './ThemeProvider';
 import { NotificationBell, NotificationsPanel } from './NotificationsPanel';
 import { useVitals } from '@/context/VitalsContext';
+import { useMQTTVitals, MQTT_STATUS } from '@/context/MQTTVitalsContext';
 
 // Data Source Indicator Component - Shows when running in simulation mode
 function DataSourceIndicator() {
@@ -86,6 +87,75 @@ function DataSourceIndicator() {
   );
 }
 
+// MQTT Connection Status Indicator
+function MQTTStatusIndicator() {
+  const { connectionStatus, messageCount, connect } = useMQTTVitals();
+
+  const statusConfig = {
+    [MQTT_STATUS.CONNECTED]: {
+      bg: 'bg-cyan-900/30',
+      border: 'border-cyan-600/50',
+      dot: 'bg-cyan-500',
+      text: 'text-cyan-400',
+      label: 'MQTT Live',
+      pulse: true,
+    },
+    [MQTT_STATUS.CONNECTING]: {
+      bg: 'bg-blue-900/30',
+      border: 'border-blue-600/50',
+      dot: 'bg-blue-500',
+      text: 'text-blue-400',
+      label: 'Connecting',
+      pulse: true,
+    },
+    [MQTT_STATUS.RECONNECTING]: {
+      bg: 'bg-orange-900/30',
+      border: 'border-orange-600/50',
+      dot: 'bg-orange-500',
+      text: 'text-orange-400',
+      label: 'Reconnecting',
+      pulse: true,
+    },
+    [MQTT_STATUS.DISCONNECTED]: {
+      bg: 'bg-slate-800/50',
+      border: 'border-slate-600/50',
+      dot: 'bg-slate-500',
+      text: 'text-slate-400',
+      label: 'Simulated',
+      pulse: false,
+    },
+    [MQTT_STATUS.ERROR]: {
+      bg: 'bg-red-900/30',
+      border: 'border-red-600/50',
+      dot: 'bg-red-500',
+      text: 'text-red-400',
+      label: 'MQTT Error',
+      pulse: false,
+    },
+  };
+
+  const config = statusConfig[connectionStatus] || statusConfig[MQTT_STATUS.DISCONNECTED];
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-2 py-1 ${config.bg} border ${config.border} rounded cursor-pointer hover:brightness-110`}
+      onClick={() => connectionStatus === MQTT_STATUS.DISCONNECTED && connect?.()}
+      role="status"
+      aria-live="polite"
+      title={connectionStatus === MQTT_STATUS.CONNECTED ? `${messageCount} messages received` : 'Click to connect'}
+    >
+      <span
+        className={`w-2 h-2 rounded-full ${config.dot} ${config.pulse ? 'animate-pulse' : ''}`}
+        aria-hidden="true"
+      />
+      <span className={`text-[10px] font-bold ${config.text}`}>{config.label}</span>
+      {connectionStatus === MQTT_STATUS.CONNECTED && messageCount > 0 && (
+        <span className="text-[9px] text-cyan-600 font-mono">({messageCount})</span>
+      )}
+    </div>
+  );
+}
+
 // Wrapper to safely use VitalsContext (may not be available in all contexts)
 function SafeDataSourceIndicator() {
   try {
@@ -99,6 +169,16 @@ function SafeDataSourceIndicator() {
       </div>
     );
   }
+}
+
+// Combined status indicator showing both data source and MQTT status
+function CombinedStatusIndicator() {
+  return (
+    <div className="flex items-center gap-2">
+      <SafeDataSourceIndicator />
+      <MQTTStatusIndicator />
+    </div>
+  );
 }
 
 export default function AppShell({ children, showNav = true }) {
@@ -175,8 +255,8 @@ export default function AppShell({ children, showNav = true }) {
               </div>
             </div>
             
-            {/* Data Source Status - Shows LIVE, SIMULATION, or STALE DATA */}
-            <SafeDataSourceIndicator />
+            {/* Data Source Status - Shows LIVE/SIMULATION and MQTT connection */}
+            <CombinedStatusIndicator />
           </div>
         </header>
 

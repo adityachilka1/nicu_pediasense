@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import Link from 'next/link';
 import Navigation from '@/components/Navigation';
 import { useAlarmSound, AlarmSoundControls, AudioEnablePrompt, CriticalAlarmBanner, WarningAlarmBanner } from '@/components/AlarmSound';
@@ -8,6 +8,7 @@ import { useKeyboardShortcuts, KeyboardShortcutsModal, KeyboardHelpButton } from
 import { ThemeToggle } from '@/components/ThemeProvider';
 import { NotificationBell, NotificationsPanel } from '@/components/NotificationsPanel';
 import { useVitals, TREND } from '@/context/VitalsContext';
+import { useMQTTVitals, MQTT_STATUS } from '@/context/MQTTVitalsContext';
 import { TrendArrow, SimulationToggle } from '@/components/VitalIndicators';
 import { COLORS } from '@/lib/data';
 
@@ -595,6 +596,28 @@ const SystemClock = memo(function SystemClock() {
   );
 });
 
+// === MQTT STATUS BADGE ===
+const MQTTStatusBadge = memo(function MQTTStatusBadge({ status, messageCount }) {
+  const config = {
+    [MQTT_STATUS.CONNECTED]: { bg: 'bg-cyan-900/50', border: 'border-cyan-600/50', text: 'text-cyan-400', label: 'MQTT Live' },
+    [MQTT_STATUS.CONNECTING]: { bg: 'bg-blue-900/50', border: 'border-blue-600/50', text: 'text-blue-400', label: 'Connecting' },
+    [MQTT_STATUS.RECONNECTING]: { bg: 'bg-orange-900/50', border: 'border-orange-600/50', text: 'text-orange-400', label: 'Reconnecting' },
+    [MQTT_STATUS.DISCONNECTED]: { bg: 'bg-slate-800/50', border: 'border-slate-600/50', text: 'text-slate-400', label: 'Simulated' },
+    [MQTT_STATUS.ERROR]: { bg: 'bg-red-900/50', border: 'border-red-600/50', text: 'text-red-400', label: 'Error' },
+  };
+  const c = config[status] || config[MQTT_STATUS.DISCONNECTED];
+
+  return (
+    <div className={`flex items-center gap-1.5 px-2 py-1 ${c.bg} border ${c.border} rounded`}>
+      <span className={`w-2 h-2 rounded-full ${status === MQTT_STATUS.CONNECTED ? 'bg-cyan-500 animate-pulse' : 'bg-slate-500'}`} />
+      <span className={`text-[10px] font-bold ${c.text}`}>{c.label}</span>
+      {status === MQTT_STATUS.CONNECTED && messageCount > 0 && (
+        <span className="text-[9px] text-cyan-600 font-mono">({messageCount})</span>
+      )}
+    </div>
+  );
+});
+
 // === MAIN CENTRAL STATION ===
 export default function NICUCentralStation() {
   // Use vitals from context for real-time updates
@@ -606,6 +629,40 @@ export default function NICUCentralStation() {
     getAlarmStats,
     updateCount,
   } = useVitals();
+
+  // Get MQTT vitals for real-time updates
+  const {
+    vitalsMap: mqttVitalsMap,
+    connectionStatus: mqttStatus,
+    isConnected: mqttConnected,
+    messageCount: mqttMessageCount,
+  } = useMQTTVitals();
+
+  // Merge MQTT data with simulated data - MQTT takes priority when connected
+  const mergedVitalsMap = useMemo(() => {
+    if (!mqttConnected || Object.keys(mqttVitalsMap).length === 0) {
+      return vitalsMap;
+    }
+
+    const merged = { ...vitalsMap };
+    for (const [patientId, mqttData] of Object.entries(mqttVitalsMap)) {
+      if (mqttData && merged[patientId]) {
+        merged[patientId] = {
+          ...merged[patientId],
+          // Override with MQTT values if available
+          ...(mqttData.spo2 !== undefined && { spo2: mqttData.spo2, spo2Trend: mqttData.spo2Trend, spo2Changed: mqttData.spo2Changed }),
+          ...(mqttData.pr !== undefined && { pr: mqttData.pr, prTrend: mqttData.prTrend, prChanged: mqttData.prChanged }),
+          ...(mqttData.rr !== undefined && { rr: mqttData.rr, rrTrend: mqttData.rrTrend, rrChanged: mqttData.rrChanged }),
+          ...(mqttData.temp !== undefined && { temp: mqttData.temp, tempTrend: mqttData.tempTrend, tempChanged: mqttData.tempChanged }),
+          ...(mqttData.fio2 !== undefined && { fio2: mqttData.fio2 }),
+          ...(mqttData.pi !== undefined && { pi: mqttData.pi }),
+          source: 'mqtt',
+          timestamp: mqttData.timestamp,
+        };
+      }
+    }
+    return merged;
+  }, [vitalsMap, mqttVitalsMap, mqttConnected]);
 
   const [acknowledgedAlarms, setAcknowledgedAlarms] = useState([]);
   const [silencedBeds, setSilencedBeds] = useState({});
@@ -742,16 +799,8 @@ export default function NICUCentralStation() {
             {/* Keyboard Shortcuts Help */}
             <KeyboardHelpButton />
 
-            {/* Connection Status */}
-            <div
-              className="flex items-center gap-1.5 px-2 py-1 bg-emerald-900/30 border border-emerald-700/50 rounded"
-              role="status"
-              aria-live="polite"
-              aria-label="Connection status: Connected"
-            >
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
-              <span className="text-[10px] font-bold text-emerald-400 uppercase">Connected</span>
-            </div>
+            {/* MQTT Connection Status */}
+            <MQTTStatusBadge status={mqttStatus} messageCount={mqttMessageCount} />
           </div>
         </div>
       </header>
@@ -773,7 +822,7 @@ export default function NICUCentralStation() {
             <PatientMonitor
               key={patient.id}
               patient={patient}
-              vitals={vitalsMap[patient.id] || { pr: '--', spo2: '--', rr: '--', temp: '--', fio2: '--', pi: '--', bp: { systolic: '--', diastolic: '--', map: '--' } }}
+              vitals={mergedVitalsMap[patient.id] || { pr: '--', spo2: '--', rr: '--', temp: '--', fio2: '--', pi: '--', bp: { systolic: '--', diastolic: '--', map: '--' } }}
             />
           ))}
         </div>

@@ -6,8 +6,58 @@ import { AlarmSoundProvider } from './AlarmSound';
 import { ThemeProvider } from './ThemeProvider';
 import { NotificationsProvider } from './NotificationsPanel';
 import { VitalsProvider } from '@/context/VitalsContext';
+import { MQTTVitalsProvider, useMQTTVitals, MQTT_STATUS } from '@/context/MQTTVitalsContext';
 import { ErrorBoundary } from './ErrorBoundary';
 import { SessionTimeoutMonitor } from './SessionTimeoutMonitor';
+import { useEffect, useRef } from 'react';
+import { useToast } from './Toast';
+import { initialPatients } from '@/lib/data';
+
+// MQTT Alarm Notifier - Shows toast notifications for MQTT alarms
+function MQTTAlarmNotifier() {
+  const { alarmsQueue, connectionStatus } = useMQTTVitals();
+  const toast = useToast();
+  const lastAlarmRef = useRef(null);
+  const connectionNotifiedRef = useRef(false);
+
+  // Show toast for new alarms
+  useEffect(() => {
+    if (alarmsQueue.length === 0) return;
+
+    const latestAlarm = alarmsQueue[0];
+    if (lastAlarmRef.current === latestAlarm.id) return;
+
+    lastAlarmRef.current = latestAlarm.id;
+
+    const patient = initialPatients.find(p => p.id === latestAlarm.patientId);
+    const bedLabel = patient ? `Bed ${patient.bed}` : `Patient ${latestAlarm.patientId}`;
+
+    const severity = latestAlarm.severity || 'warning';
+    const message = `${bedLabel}: ${latestAlarm.parameter || 'Alarm'} - ${latestAlarm.value || 'Alert'}`;
+
+    if (severity === 'critical') {
+      toast.error(message, 8000);
+    } else {
+      toast.warning(message, 6000);
+    }
+  }, [alarmsQueue, toast]);
+
+  // Notify when MQTT connection status changes
+  useEffect(() => {
+    if (connectionStatus === MQTT_STATUS.CONNECTED && !connectionNotifiedRef.current) {
+      toast.success('MQTT real-time connection established', 3000);
+      connectionNotifiedRef.current = true;
+    } else if (connectionStatus === MQTT_STATUS.ERROR) {
+      toast.error('MQTT connection error - falling back to simulation', 5000);
+      connectionNotifiedRef.current = false;
+    } else if (connectionStatus === MQTT_STATUS.DISCONNECTED && connectionNotifiedRef.current) {
+      toast.info('MQTT disconnected - using simulated data', 3000);
+      connectionNotifiedRef.current = false;
+    }
+  }, [connectionStatus, toast]);
+
+  return null;
+}
 
 // Critical error fallback for healthcare application
 function CriticalErrorFallback({ error, resetError }) {
@@ -65,18 +115,21 @@ export function Providers({ children }) {
     >
       <SessionProvider>
         <ThemeProvider>
-          <VitalsProvider updateInterval={2000}>
-            <ErrorBoundary title="Vitals display error">
-              <AlarmSoundProvider>
-                <NotificationsProvider>
-                  <ToastProvider>
-                    <SessionTimeoutMonitor />
-                    {children}
-                  </ToastProvider>
-                </NotificationsProvider>
-              </AlarmSoundProvider>
-            </ErrorBoundary>
-          </VitalsProvider>
+          <MQTTVitalsProvider unitId="unit-a">
+            <VitalsProvider updateInterval={2000}>
+              <ErrorBoundary title="Vitals display error">
+                <AlarmSoundProvider>
+                  <NotificationsProvider>
+                    <ToastProvider>
+                      <MQTTAlarmNotifier />
+                      <SessionTimeoutMonitor />
+                      {children}
+                    </ToastProvider>
+                  </NotificationsProvider>
+                </AlarmSoundProvider>
+              </ErrorBoundary>
+            </VitalsProvider>
+          </MQTTVitalsProvider>
         </ThemeProvider>
       </SessionProvider>
     </ErrorBoundary>
