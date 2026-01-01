@@ -5,6 +5,67 @@ import { NextResponse } from 'next/server';
 const ENFORCE_HTTPS = process.env.NODE_ENV === 'production';
 const HSTS_MAX_AGE = 31536000; // 1 year in seconds
 
+// CSP nonce configuration
+const CSP_NONCE_ENABLED = process.env.CSP_NONCE_ENABLED !== 'false';
+
+/**
+ * Generate a cryptographically secure nonce for CSP
+ * Uses Web Crypto API available in Edge Runtime
+ */
+function generateNonce() {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Buffer.from(array).toString('base64');
+}
+
+/**
+ * Build Content Security Policy with nonce support
+ * @param {string} nonce - The generated nonce for this request
+ * @returns {string} - The CSP header value
+ */
+function buildCSP(nonce) {
+  const csp = {
+    'default-src': ["'self'"],
+    'script-src': [
+      "'self'",
+      // In development, we need unsafe-eval for React Fast Refresh
+      process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : '',
+      // Add nonce for inline scripts
+      nonce ? `'nonce-${nonce}'` : '',
+      // Fallback for browsers that don't support nonce
+      "'strict-dynamic'",
+    ].filter(Boolean),
+    'style-src': [
+      "'self'",
+      // Tailwind and other CSS frameworks often need unsafe-inline
+      "'unsafe-inline'",
+    ],
+    'img-src': ["'self'", 'data:', 'blob:'],
+    'font-src': ["'self'", 'data:'],
+    'connect-src': [
+      "'self'",
+      // WebSocket connections for real-time updates
+      'ws:',
+      'wss:',
+    ],
+    'frame-ancestors': ["'none'"],
+    'base-uri': ["'self'"],
+    'form-action': ["'self'"],
+    'object-src': ["'none'"],
+    'upgrade-insecure-requests': [],
+  };
+
+  // Build the CSP string
+  return Object.entries(csp)
+    .map(([key, values]) => {
+      if (values.length === 0) {
+        return key;
+      }
+      return `${key} ${values.join(' ')}`;
+    })
+    .join('; ');
+}
+
 /**
  * Security headers applied to all responses
  * These are also defined in next.config.js for static assets
@@ -58,8 +119,11 @@ function enforceHttps(request) {
 
 /**
  * Apply security headers to response
+ * @param {NextResponse} response - The response object
+ * @param {boolean} isSecure - Whether the request is secure
+ * @param {string} nonce - The CSP nonce for this request
  */
-function applySecurityHeaders(response, isSecure) {
+function applySecurityHeaders(response, isSecure, nonce) {
   // Apply standard security headers
   for (const [key, value] of Object.entries(securityHeaders)) {
     response.headers.set(key, value);
@@ -71,6 +135,13 @@ function applySecurityHeaders(response, isSecure) {
       'Strict-Transport-Security',
       `max-age=${HSTS_MAX_AGE}; includeSubDomains; preload`
     );
+  }
+
+  // Apply Content Security Policy with nonce
+  if (CSP_NONCE_ENABLED && nonce) {
+    response.headers.set('Content-Security-Policy', buildCSP(nonce));
+    // Pass nonce to server components via custom header
+    response.headers.set('x-nonce', nonce);
   }
 
   return response;
@@ -135,6 +206,9 @@ export default auth((req) => {
   const { nextUrl } = req;
   const isSecure = isSecureRequest(req);
 
+  // Generate a unique nonce for this request (for CSP)
+  const nonce = CSP_NONCE_ENABLED ? generateNonce() : null;
+
   // STEP 1: Enforce HTTPS in production (before any other logic)
   const httpsRedirect = enforceHttps(req);
   if (httpsRedirect) {
@@ -156,13 +230,13 @@ export default auth((req) => {
 
   if (isAuthRoute || isHealthRoute) {
     const response = NextResponse.next();
-    return applySecurityHeaders(response, isSecure);
+    return applySecurityHeaders(response, isSecure, nonce);
   }
 
   // Redirect logged-in users away from login page
   if (isLoggedIn && nextUrl.pathname === '/login') {
     const response = NextResponse.redirect(new URL('/', nextUrl));
-    return applySecurityHeaders(response, isSecure);
+    return applySecurityHeaders(response, isSecure, nonce);
   }
 
   // Redirect non-logged-in users to login page
@@ -170,19 +244,19 @@ export default auth((req) => {
     const loginUrl = new URL('/login', nextUrl);
     loginUrl.searchParams.set('callbackUrl', nextUrl.pathname);
     const response = NextResponse.redirect(loginUrl);
-    return applySecurityHeaders(response, isSecure);
+    return applySecurityHeaders(response, isSecure, nonce);
   }
 
   // Role-based access control for authenticated users
   if (isLoggedIn && userRole && !isPublicRoute) {
     if (!hasPermission(userRole, nextUrl.pathname)) {
       const response = NextResponse.redirect(new URL('/unauthorized', nextUrl));
-      return applySecurityHeaders(response, isSecure);
+      return applySecurityHeaders(response, isSecure, nonce);
     }
   }
 
   const response = NextResponse.next();
-  return applySecurityHeaders(response, isSecure);
+  return applySecurityHeaders(response, isSecure, nonce);
 });
 
 export const config = {

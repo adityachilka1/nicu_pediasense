@@ -11,6 +11,7 @@ const REALTIME_INTERVAL = 2000;
 
 // Large trend chart component (IEC 60601-2-49 compliant)
 // Medical trend display standards: proper scaling, alarm limits, time axis
+// Styled to match Philips IntelliVue / GE CARESCAPE aesthetics
 const LargeTrendChart = ({ data, color, label, unit, limits, height = 200 }) => {
   const canvasRef = useRef(null);
 
@@ -19,136 +20,264 @@ const LargeTrendChart = ({ data, color, label, unit, limits, height = 200 }) => 
     if (!canvas || !data.length) return;
 
     const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
     const w = canvas.width;
     const h = canvas.height;
-    const padding = { top: 25, right: 65, bottom: 35, left: 55 };
+    const padding = { top: 30, right: 70, bottom: 40, left: 60 };
     const chartW = w - padding.left - padding.right;
     const chartH = h - padding.top - padding.bottom;
 
-    // Clear with medical-grade dark background
-    ctx.fillStyle = '#0a0e14';
+    // Clear canvas
+    ctx.clearRect(0, 0, w, h);
+
+    // Medical-grade dark background with subtle gradient
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, h);
+    bgGradient.addColorStop(0, '#0a1015');
+    bgGradient.addColorStop(0.5, '#0d1418');
+    bgGradient.addColorStop(1, '#0a1015');
+    ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, w, h);
 
-    // Draw chart border (medical standard - visible chart boundary)
-    ctx.strokeStyle = 'rgba(71, 85, 105, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(padding.left, padding.top, chartW, chartH);
-    
-    // Find min/max
+    // Find min/max for scaling
     const values = data.map(d => d.value);
     const dataMin = Math.min(...values);
     const dataMax = Math.max(...values);
     const min = limits ? Math.min(limits[0] - 5, dataMin - 5) : dataMin - 5;
     const max = limits ? Math.max(limits[1] + 5, dataMax + 5) : dataMax + 5;
     const range = max - min;
-    
-    // Draw grid
-    ctx.strokeStyle = 'rgba(51, 65, 85, 0.3)';
-    ctx.lineWidth = 0.5;
-    
-    // Horizontal grid lines
+
+    // Draw major grid lines (every 5 units on Y-axis feel)
     const ySteps = 5;
+
+    // Minor grid lines first (more subtle)
+    ctx.strokeStyle = 'rgba(30, 58, 70, 0.4)';
+    ctx.lineWidth = 0.5;
+    const minorYSteps = ySteps * 2;
+    for (let i = 0; i <= minorYSteps; i++) {
+      const y = padding.top + (i / minorYSteps) * chartH;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(w - padding.right, y);
+      ctx.stroke();
+    }
+
+    // Vertical minor grid lines
+    const timeSteps = 12;
+    for (let i = 0; i <= timeSteps; i++) {
+      const x = padding.left + (i / timeSteps) * chartW;
+      ctx.beginPath();
+      ctx.moveTo(x, padding.top);
+      ctx.lineTo(x, padding.top + chartH);
+      ctx.stroke();
+    }
+
+    // Major grid lines (brighter)
+    ctx.strokeStyle = 'rgba(40, 80, 95, 0.6)';
+    ctx.lineWidth = 1;
     for (let i = 0; i <= ySteps; i++) {
       const y = padding.top + (i / ySteps) * chartH;
       ctx.beginPath();
       ctx.moveTo(padding.left, y);
       ctx.lineTo(w - padding.right, y);
       ctx.stroke();
-      
-      // Y-axis labels
+
+      // Y-axis labels with better styling
       const value = max - (i / ySteps) * range;
-      ctx.fillStyle = '#64748b';
-      ctx.font = '10px monospace';
+      ctx.fillStyle = '#5a7a8a';
+      ctx.font = '11px "SF Mono", Monaco, monospace';
       ctx.textAlign = 'right';
-      ctx.fillText(value.toFixed(0), padding.left - 8, y + 4);
+      ctx.fillText(value.toFixed(0), padding.left - 10, y + 4);
     }
-    
+
+    // Chart border (subtle glow effect)
+    ctx.strokeStyle = 'rgba(60, 100, 120, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(padding.left, padding.top, chartW, chartH);
+
     // Time labels
-    ctx.fillStyle = '#64748b';
-    ctx.font = '10px monospace';
+    ctx.fillStyle = '#5a7a8a';
+    ctx.font = '10px "SF Mono", Monaco, monospace';
     ctx.textAlign = 'center';
-    const timeSteps = 6;
-    for (let i = 0; i <= timeSteps; i++) {
-      const x = padding.left + (i / timeSteps) * chartW;
-      const dataIdx = Math.floor((i / timeSteps) * (data.length - 1));
+    const labelSteps = 6;
+    for (let i = 0; i <= labelSteps; i++) {
+      const x = padding.left + (i / labelSteps) * chartW;
+      const dataIdx = Math.floor((i / labelSteps) * (data.length - 1));
       const time = new Date(data[dataIdx]?.time || Date.now());
-      ctx.fillText(time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), x, h - 8);
+      ctx.fillText(time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), x, h - 12);
     }
-    
-    // Draw limit lines
+
+    // Draw alarm limit zones (shaded areas outside safe range)
     if (limits) {
-      ctx.setLineDash([5, 5]);
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
-      ctx.lineWidth = 1;
-      
-      // High limit
       const highY = padding.top + ((max - limits[1]) / range) * chartH;
+      const lowY = padding.top + ((max - limits[0]) / range) * chartH;
+
+      // High alarm zone (above upper limit)
+      const highZoneGradient = ctx.createLinearGradient(0, padding.top, 0, highY);
+      highZoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
+      highZoneGradient.addColorStop(1, 'rgba(239, 68, 68, 0.02)');
+      ctx.fillStyle = highZoneGradient;
+      ctx.fillRect(padding.left, padding.top, chartW, highY - padding.top);
+
+      // Low alarm zone (below lower limit)
+      const lowZoneGradient = ctx.createLinearGradient(0, lowY, 0, padding.top + chartH);
+      lowZoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.02)');
+      lowZoneGradient.addColorStop(1, 'rgba(239, 68, 68, 0.15)');
+      ctx.fillStyle = lowZoneGradient;
+      ctx.fillRect(padding.left, lowY, chartW, padding.top + chartH - lowY);
+
+      // Draw limit lines (dashed)
+      ctx.setLineDash([8, 4]);
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
+      ctx.lineWidth = 1.5;
+
+      // High limit line
       ctx.beginPath();
       ctx.moveTo(padding.left, highY);
       ctx.lineTo(w - padding.right, highY);
       ctx.stroke();
-      
-      // Low limit  
-      const lowY = padding.top + ((max - limits[0]) / range) * chartH;
+
+      // Low limit line
       ctx.beginPath();
       ctx.moveTo(padding.left, lowY);
       ctx.lineTo(w - padding.right, lowY);
       ctx.stroke();
-      
+
       ctx.setLineDash([]);
-      
-      // Limit labels
-      ctx.fillStyle = '#ef4444';
-      ctx.font = '10px monospace';
+
+      // Limit labels with background
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+      ctx.font = 'bold 10px "SF Mono", Monaco, monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`▲ ${limits[1]}`, w - padding.right + 5, highY + 4);
-      ctx.fillText(`▼ ${limits[0]}`, w - padding.right + 5, lowY + 4);
+      ctx.fillText(`▲ ${limits[1]}`, w - padding.right + 8, highY + 4);
+      ctx.fillText(`▼ ${limits[0]}`, w - padding.right + 8, lowY + 4);
     }
-    
-    // Draw data line
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+
+    // Create gradient fill under the curve
+    const fillGradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+    fillGradient.addColorStop(0, color + '40');
+    fillGradient.addColorStop(0.5, color + '20');
+    fillGradient.addColorStop(1, color + '05');
+
+    // Build the curve path with smoothing (Catmull-Rom spline for natural look)
+    const points = data.map((point, i) => ({
+      x: padding.left + (i / (data.length - 1)) * chartW,
+      y: padding.top + ((max - point.value) / range) * chartH
+    }));
+
+    // Draw filled area first
     ctx.beginPath();
-    
-    data.forEach((point, i) => {
-      const x = padding.left + (i / (data.length - 1)) * chartW;
-      const y = padding.top + ((max - point.value) / range) * chartH;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    
-    // Fill under curve
+    ctx.moveTo(points[0].x, points[0].y);
+
+    // Use quadratic curves for smoother line
+    for (let i = 1; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+    }
+    // Connect to last point
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+
+    // Complete the fill path
     ctx.lineTo(padding.left + chartW, padding.top + chartH);
     ctx.lineTo(padding.left, padding.top + chartH);
     ctx.closePath();
-    ctx.fillStyle = color + '10';
+    ctx.fillStyle = fillGradient;
     ctx.fill();
-    
-    // Current value
-    const lastValue = data[data.length - 1]?.value;
-    const lastY = padding.top + ((max - lastValue) / range) * chartH;
-    
-    // Dot at end
-    ctx.fillStyle = color;
+
+    // Draw the main trend line with glow effect
+    // Outer glow
+    ctx.strokeStyle = color + '30';
+    ctx.lineWidth = 6;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(padding.left + chartW, lastY, 4, 0, Math.PI * 2);
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+    }
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    ctx.stroke();
+
+    // Middle glow
+    ctx.strokeStyle = color + '60';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+    }
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    ctx.stroke();
+
+    // Main line (bright)
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+    }
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    ctx.stroke();
+
+    // Current value indicator (pulsing dot at end)
+    const lastPoint = points[points.length - 1];
+    const lastValue = data[data.length - 1]?.value;
+
+    // Outer glow ring
+    ctx.beginPath();
+    ctx.arc(lastPoint.x, lastPoint.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = color + '30';
     ctx.fill();
-    
-    // Current value label
+
+    // Inner dot
+    ctx.beginPath();
+    ctx.arc(lastPoint.x, lastPoint.y, 5, 0, Math.PI * 2);
     ctx.fillStyle = color;
-    ctx.font = 'bold 14px monospace';
+    ctx.fill();
+
+    // White center
+    ctx.beginPath();
+    ctx.arc(lastPoint.x, lastPoint.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    // Current value badge
+    const badgeX = w - padding.right + 8;
+    const badgeY = lastPoint.y;
+
+    // Badge background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(badgeX - 2, badgeY - 10, 55, 20, 4);
+    ctx.fill();
+    ctx.strokeStyle = color + '80';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Badge text
+    ctx.fillStyle = color;
+    ctx.font = 'bold 12px "SF Mono", Monaco, monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(`${lastValue?.toFixed(1)} ${unit}`, w - padding.right + 5, lastY + 5);
-    
+    ctx.fillText(`${lastValue?.toFixed(1)}${unit}`, badgeX + 2, badgeY + 4);
+
   }, [data, color, limits, unit]);
-  
+
   return (
     <div className="relative">
-      <div className="absolute top-2 left-2 text-sm font-bold" style={{ color }}>{label}</div>
-      <canvas ref={canvasRef} width={800} height={height} className="w-full" />
+      <div
+        className="absolute top-2 left-3 text-sm font-bold tracking-wide z-10"
+        style={{ color, textShadow: `0 0 10px ${color}50` }}
+      >
+        {label}
+      </div>
+      <canvas ref={canvasRef} width={800} height={height} className="w-full rounded" />
     </div>
   );
 };

@@ -5,14 +5,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
 // Demo credentials - only shown in development mode
+// Must match the credentials in prisma/seed.js
 const isDemoMode = process.env.NODE_ENV === 'development';
 const DEMO_EMAIL = 'nurse.moore@hospital.org';
-const DEMO_PASSWORD = 'nurse123';
+const DEMO_PASSWORD = 'Nurse#Secure2024!';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const timeoutReason = searchParams.get('reason');
 
   const [isLoading, setIsLoading] = useState(false);
   const [loginMethod, setLoginMethod] = useState('credentials');
@@ -20,6 +22,7 @@ function LoginForm() {
   const [email, setEmail] = useState(isDemoMode ? DEMO_EMAIL : '');
   const [password, setPassword] = useState(isDemoMode ? DEMO_PASSWORD : '');
   const [error, setError] = useState('');
+  const [showTimeoutMessage, setShowTimeoutMessage] = useState(timeoutReason === 'timeout');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -108,6 +111,32 @@ function LoginForm() {
           </div>
           
           <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8">
+            {/* Session timeout message */}
+            {showTimeoutMessage && (
+              <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-amber-400 text-sm font-medium">Session Expired</p>
+                    <p className="text-amber-400/70 text-xs mt-1">
+                      Your session expired due to inactivity. Please sign in again.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowTimeoutMessage(false)}
+                    className="text-amber-400/50 hover:text-amber-400 p-1"
+                    aria-label="Dismiss message"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Demo mode banner - only shown in development */}
             {isDemoMode && (
               <div className="mb-6 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">

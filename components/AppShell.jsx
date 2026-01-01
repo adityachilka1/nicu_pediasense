@@ -7,6 +7,99 @@ import { initialPatients } from '@/lib/data';
 import { AlarmSoundControls, useAlarmSound } from './AlarmSound';
 import { ThemeToggle } from './ThemeProvider';
 import { NotificationBell, NotificationsPanel } from './NotificationsPanel';
+import { useVitals } from '@/context/VitalsContext';
+
+// Data Source Indicator Component - Shows when running in simulation mode
+function DataSourceIndicator() {
+  const { dataSource, isSimulating, vitalsMap, refreshData } = useVitals();
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [isStale, setIsStale] = useState(false);
+
+  // Track last update time and detect stale data
+  useEffect(() => {
+    const vitalsArray = Object.values(vitalsMap);
+    if (vitalsArray.length > 0) {
+      const latestTimestamp = Math.max(...vitalsArray.map(v => v.timestamp || 0));
+      setLastUpdate(latestTimestamp);
+    }
+  }, [vitalsMap]);
+
+  // Check for stale data (no update in 10 seconds)
+  useEffect(() => {
+    const checkStale = setInterval(() => {
+      const timeSinceUpdate = Date.now() - lastUpdate;
+      setIsStale(timeSinceUpdate > 10000); // 10 seconds
+    }, 1000);
+    return () => clearInterval(checkStale);
+  }, [lastUpdate]);
+
+  const isSimulationMode = dataSource === 'simulation' || isSimulating;
+
+  if (isSimulationMode) {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-2 py-1 bg-yellow-900/30 border border-yellow-600/50 rounded"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" aria-hidden="true" />
+        <span className="text-[10px] font-bold text-yellow-400">SIMULATION</span>
+        <button
+          onClick={() => refreshData?.()}
+          className="ml-1 text-[9px] text-yellow-500 hover:text-yellow-300 underline"
+          aria-label="Retry connecting to live data"
+        >
+          retry
+        </button>
+      </div>
+    );
+  }
+
+  if (isStale) {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-2 py-1 bg-orange-900/30 border border-orange-600/50 rounded"
+        role="alert"
+        aria-live="assertive"
+      >
+        <span className="w-2 h-2 rounded-full bg-orange-500" aria-hidden="true" />
+        <span className="text-[10px] font-bold text-orange-400">STALE DATA</span>
+        <button
+          onClick={() => refreshData?.()}
+          className="ml-1 text-[9px] text-orange-500 hover:text-orange-300 underline"
+          aria-label="Refresh vitals data"
+        >
+          refresh
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-1.5 px-2 py-1 bg-emerald-900/30 border border-emerald-700/50 rounded"
+      role="status"
+    >
+      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
+      <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
+    </div>
+  );
+}
+
+// Wrapper to safely use VitalsContext (may not be available in all contexts)
+function SafeDataSourceIndicator() {
+  try {
+    return <DataSourceIndicator />;
+  } catch {
+    // VitalsContext not available, show default connected status
+    return (
+      <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-900/30 border border-emerald-700/50 rounded">
+        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="text-[10px] font-bold text-emerald-400">CONNECTED</span>
+      </div>
+    );
+  }
+}
 
 export default function AppShell({ children, showNav = true }) {
   const [currentTime, setCurrentTime] = useState(null);
@@ -82,11 +175,8 @@ export default function AppShell({ children, showNav = true }) {
               </div>
             </div>
             
-            {/* Status */}
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-900/30 border border-emerald-700/50 rounded">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-emerald-400">CONNECTED</span>
-            </div>
+            {/* Data Source Status - Shows LIVE, SIMULATION, or STALE DATA */}
+            <SafeDataSourceIndicator />
           </div>
         </header>
 
