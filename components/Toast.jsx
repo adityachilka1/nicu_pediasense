@@ -4,12 +4,19 @@ import { createContext, useContext, useState, useCallback } from 'react';
 
 const ToastContext = createContext(null);
 
+const MAX_TOASTS = 3; // Limit visible toasts to prevent clutter
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const addToast = useCallback(({ message, type = 'info', duration = 4000 }) => {
     const id = Date.now() + Math.random();
-    setToasts(prev => [...prev, { id, message, type }]);
+
+    setToasts(prev => {
+      // Keep only the newest MAX_TOASTS - 1 to make room for new one
+      const trimmed = prev.slice(0, MAX_TOASTS - 1);
+      return [{ id, message, type }, ...trimmed];
+    });
 
     if (duration > 0) {
       setTimeout(() => {
@@ -18,6 +25,10 @@ export function ToastProvider({ children }) {
     }
 
     return id;
+  }, []);
+
+  const clearAllToasts = useCallback(() => {
+    setToasts([]);
   }, []);
 
   const removeToast = useCallback((id) => {
@@ -29,6 +40,7 @@ export function ToastProvider({ children }) {
     error: (message, duration) => addToast({ message, type: 'error', duration }),
     warning: (message, duration) => addToast({ message, type: 'warning', duration }),
     info: (message, duration) => addToast({ message, type: 'info', duration }),
+    clearAll: clearAllToasts,
   };
 
   return (

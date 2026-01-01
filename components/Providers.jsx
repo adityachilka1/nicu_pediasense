@@ -14,13 +14,18 @@ import { useToast } from './Toast';
 import { initialPatients } from '@/lib/data';
 
 // MQTT Alarm Notifier - Shows toast notifications for MQTT alarms
+// Only shows critical alarms to avoid toast flooding
 function MQTTAlarmNotifier() {
   const { alarmsQueue, connectionStatus } = useMQTTVitals();
   const toast = useToast();
   const lastAlarmRef = useRef(null);
   const connectionNotifiedRef = useRef(false);
+  const lastToastTimeRef = useRef(0);
 
-  // Show toast for new alarms
+  // Throttle time between alarm toasts (ms) - only show 1 toast every 10 seconds
+  const ALARM_TOAST_THROTTLE = 10000;
+
+  // Show toast only for CRITICAL alarms and with throttling
   useEffect(() => {
     if (alarmsQueue.length === 0) return;
 
@@ -29,17 +34,20 @@ function MQTTAlarmNotifier() {
 
     lastAlarmRef.current = latestAlarm.id;
 
+    // Only show toasts for critical alarms
+    const severity = latestAlarm.severity || 'warning';
+    if (severity !== 'critical') return;
+
+    // Throttle: don't show more than 1 alarm toast per ALARM_TOAST_THROTTLE ms
+    const now = Date.now();
+    if (now - lastToastTimeRef.current < ALARM_TOAST_THROTTLE) return;
+    lastToastTimeRef.current = now;
+
     const patient = initialPatients.find(p => p.id === latestAlarm.patientId);
     const bedLabel = patient ? `Bed ${patient.bed}` : `Patient ${latestAlarm.patientId}`;
+    const message = `${bedLabel}: ${latestAlarm.parameter || 'Critical Alarm'}`;
 
-    const severity = latestAlarm.severity || 'warning';
-    const message = `${bedLabel}: ${latestAlarm.parameter || 'Alarm'} - ${latestAlarm.value || 'Alert'}`;
-
-    if (severity === 'critical') {
-      toast.error(message, 8000);
-    } else {
-      toast.warning(message, 6000);
-    }
+    toast.error(message, 5000);
   }, [alarmsQueue, toast]);
 
   // Notify when MQTT connection status changes
