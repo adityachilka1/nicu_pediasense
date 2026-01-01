@@ -15,7 +15,10 @@
     "test:e2e:headed": "playwright test --headed",
     "db:seed": "node --experimental-vm-modules prisma/seed.js",
     "db:migrate": "npx prisma migrate dev",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "mqtt:broker": "node scripts/mqtt-broker.js",
+    "mqtt:publisher": "node scripts/mock-vitals-publisher.js",
+    "mqtt:dev": "node scripts/mqtt-broker.js & sleep 2 && node scripts/mock-vitals-publisher.js"
   },
   "prisma": {
     "seed": "node --experimental-vm-modules prisma/seed.js"
@@ -24,15 +27,18 @@
     "@next/swc-darwin-arm64": "^16.1.1",
     "@prisma/adapter-better-sqlite3": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "aedes": "^0.51.3",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.5.0",
     "dotenv": "^17.2.3",
     "ioredis": "^5.8.2",
+    "mqtt": "^5.14.1",
     "next": "^16.1.1",
     "next-auth": "^5.0.0-beta.30",
     "prisma": "^7.2.0",
     "react": "^18",
     "react-dom": "^18",
+    "ws": "^8.18.3",
     "zod": "^4.2.1"
   },
   "devDependencies": {
@@ -48,6 +54,7 @@
     "jest-environment-jsdom": "^30.2.0",
     "playwright": "^1.57.0",
     "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.3"
+    "tailwindcss": "^3.4.3",
+    "websocket-stream": "^5.5.2"
   }
 }

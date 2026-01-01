@@ -7,64 +7,291 @@ import AppShell from '@/components/AppShell';
 import PatientHeader from '@/components/PatientHeader';
 import PatientTabs from '@/components/PatientTabs';
 import { initialPatients, generateVitals, COLORS, getStatusColor } from '@/lib/data';
+import { useMQTTVitals } from '@/hooks/useMQTTVitals';
 
-// Mini trend chart component
-const TrendChart = ({ data, color, height = 60, showGrid = true }) => {
+// Real-time sweeping trend chart - like real medical monitors
+const TrendChart = ({ color, height = 60, baseValue, variance, limits }) => {
   const canvasRef = useRef(null);
-  
+  const bufferRef = useRef([]);
+  const writeIndexRef = useRef(0);
+  const animationRef = useRef(null);
+  const lastValueRef = useRef(baseValue);
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !data.length) return;
-    
+    if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
-    
-    // Clear
-    ctx.fillStyle = '#0a0e14';
-    ctx.fillRect(0, 0, w, h);
-    
-    // Grid
-    if (showGrid) {
-      ctx.strokeStyle = 'rgba(51, 65, 85, 0.3)';
+    const padding = 4;
+
+    // Initialize buffer
+    bufferRef.current = new Array(w).fill(null);
+    writeIndexRef.current = 0;
+    lastValueRef.current = baseValue;
+
+    // Calculate Y position for a value
+    const getY = (value) => {
+      const min = (limits?.[0] || baseValue - variance * 3) - 2;
+      const max = (limits?.[1] || baseValue + variance * 3) + 2;
+      const range = max - min;
+      return padding + (1 - (value - min) / range) * (h - padding * 2);
+    };
+
+    // Generate realistic value with random walk
+    const generateValue = () => {
+      const drift = (baseValue - lastValueRef.current) * 0.08;
+      let newValue = lastValueRef.current + drift + (Math.random() - 0.5) * variance * 0.3;
+
+      // Occasional larger variations
+      if (Math.random() < 0.02) {
+        newValue += (Math.random() - 0.5) * variance * 1.5;
+      }
+
+      // Clamp to reasonable range
+      const min = limits?.[0] || baseValue - variance * 4;
+      const max = limits?.[1] || baseValue + variance * 4;
+      newValue = Math.max(min - 5, Math.min(max + 5, newValue));
+
+      lastValueRef.current = newValue;
+      return newValue;
+    };
+
+    // Draw the grid
+    const drawGrid = () => {
+      // Background gradient
+      const bgGradient = ctx.createLinearGradient(0, 0, 0, h);
+      bgGradient.addColorStop(0, '#0a1015');
+      bgGradient.addColorStop(0.5, '#0d1418');
+      bgGradient.addColorStop(1, '#0a1015');
+      ctx.fillStyle = bgGradient;
+      ctx.fillRect(0, 0, w, h);
+
+      // Minor grid
+      ctx.strokeStyle = 'rgba(30, 58, 70, 0.3)';
       ctx.lineWidth = 0.5;
-      for (let y = 0; y < h; y += 15) {
+      for (let y = 0; y < h; y += 10) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(w, y);
         ctx.stroke();
       }
-    }
-    
-    // Find min/max
-    const values = data.map(d => d.value);
-    const min = Math.min(...values) - 5;
-    const max = Math.max(...values) + 5;
-    const range = max - min;
-    
-    // Draw line
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    
-    data.forEach((point, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = h - ((point.value - min) / range) * h;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    
-    // Fill under
-    ctx.lineTo(w, h);
-    ctx.lineTo(0, h);
-    ctx.closePath();
-    ctx.fillStyle = color + '15';
-    ctx.fill();
-  }, [data, color, showGrid]);
-  
-  return <canvas ref={canvasRef} width={300} height={height} className="w-full h-full" />;
+      for (let x = 0; x < w; x += 15) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+
+      // Major grid
+      ctx.strokeStyle = 'rgba(40, 80, 95, 0.5)';
+      ctx.lineWidth = 0.5;
+      for (let y = 0; y < h; y += 30) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Draw limit lines if provided
+      if (limits) {
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        ctx.lineWidth = 1;
+
+        const highY = getY(limits[1]);
+        const lowY = getY(limits[0]);
+
+        ctx.beginPath();
+        ctx.moveTo(0, highY);
+        ctx.lineTo(w, highY);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, lowY);
+        ctx.lineTo(w, lowY);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+      }
+    };
+
+    // Main render loop
+    const render = () => {
+      // Generate new value and store Y position
+      const value = generateValue();
+      const yPos = getY(value);
+      bufferRef.current[writeIndexRef.current] = yPos;
+
+      // Redraw everything
+      drawGrid();
+
+      // Draw the waveform with glow effect
+      const gapSize = 6;
+      const gapStart = writeIndexRef.current;
+      const gapEnd = (writeIndexRef.current + gapSize) % w;
+
+      // Create gradient for fill
+      const fillGradient = ctx.createLinearGradient(0, 0, 0, h);
+      fillGradient.addColorStop(0, color + '30');
+      fillGradient.addColorStop(0.5, color + '15');
+      fillGradient.addColorStop(1, color + '05');
+
+      // Draw filled area
+      ctx.beginPath();
+      let started = false;
+      let firstX = 0, firstY = h;
+
+      for (let i = 0; i < w; i++) {
+        const idx = (gapEnd + i) % w;
+        if (bufferRef.current[idx] === null) continue;
+
+        let inGap = false;
+        if (gapStart < gapEnd) {
+          inGap = idx >= gapStart && idx < gapEnd;
+        } else {
+          inGap = idx >= gapStart || idx < gapEnd;
+        }
+        if (inGap) continue;
+
+        if (!started) {
+          firstX = idx;
+          firstY = bufferRef.current[idx];
+          ctx.moveTo(idx, bufferRef.current[idx]);
+          started = true;
+        } else {
+          ctx.lineTo(idx, bufferRef.current[idx]);
+        }
+      }
+
+      if (started) {
+        // Complete the fill path
+        ctx.lineTo(writeIndexRef.current > 0 ? writeIndexRef.current - 1 : w - 1, h);
+        ctx.lineTo(firstX, h);
+        ctx.closePath();
+        ctx.fillStyle = fillGradient;
+        ctx.fill();
+      }
+
+      // Draw outer glow
+      ctx.strokeStyle = color + '30';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      started = false;
+
+      for (let i = 0; i < w; i++) {
+        const idx = (gapEnd + i) % w;
+        if (bufferRef.current[idx] === null) continue;
+
+        let inGap = false;
+        if (gapStart < gapEnd) {
+          inGap = idx >= gapStart && idx < gapEnd;
+        } else {
+          inGap = idx >= gapStart || idx < gapEnd;
+        }
+        if (inGap) {
+          started = false;
+          continue;
+        }
+
+        if (!started) {
+          ctx.moveTo(idx, bufferRef.current[idx]);
+          started = true;
+        } else {
+          ctx.lineTo(idx, bufferRef.current[idx]);
+        }
+      }
+      ctx.stroke();
+
+      // Draw main line
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 4;
+      ctx.beginPath();
+      started = false;
+
+      for (let i = 0; i < w; i++) {
+        const idx = (gapEnd + i) % w;
+        if (bufferRef.current[idx] === null) continue;
+
+        let inGap = false;
+        if (gapStart < gapEnd) {
+          inGap = idx >= gapStart && idx < gapEnd;
+        } else {
+          inGap = idx >= gapStart || idx < gapEnd;
+        }
+        if (inGap) {
+          started = false;
+          continue;
+        }
+
+        if (!started) {
+          ctx.moveTo(idx, bufferRef.current[idx]);
+          started = true;
+        } else {
+          ctx.lineTo(idx, bufferRef.current[idx]);
+        }
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Draw sweep cursor
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(writeIndexRef.current, 0, 2, h);
+      ctx.globalAlpha = 1;
+
+      // Draw current value dot
+      const currentY = bufferRef.current[writeIndexRef.current > 0 ? writeIndexRef.current - 1 : w - 1];
+      if (currentY !== null) {
+        const dotX = writeIndexRef.current > 0 ? writeIndexRef.current - 1 : w - 1;
+
+        // Outer glow
+        ctx.beginPath();
+        ctx.arc(dotX, currentY, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color + '40';
+        ctx.fill();
+
+        // Inner dot
+        ctx.beginPath();
+        ctx.arc(dotX, currentY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // White center
+        ctx.beginPath();
+        ctx.arc(dotX, currentY, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+
+      // Advance write position
+      writeIndexRef.current = (writeIndexRef.current + 1) % w;
+
+      // Schedule next frame (slower for trend, ~30fps equivalent feel)
+      animationRef.current = setTimeout(() => {
+        requestAnimationFrame(render);
+      }, 33);
+    };
+
+    // Start rendering
+    drawGrid();
+    animationRef.current = setTimeout(() => {
+      requestAnimationFrame(render);
+    }, 100);
+
+    return () => {
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+      }
+    };
+  }, [color, baseValue, variance, limits]);
+
+  return <canvas ref={canvasRef} width={300} height={height} className="w-full h-full rounded" />;
 };
 
 // Pleth waveform component
@@ -148,6 +375,32 @@ const PlethWaveform = ({ color }) => {
   return <canvas ref={canvasRef} width={500} height={80} className="w-full" />;
 };
 
+// MQTT Connection Status Indicator
+const MQTTStatusIndicator = ({ status }) => {
+  const statusColors = {
+    connected: 'bg-green-500',
+    connecting: 'bg-yellow-500 animate-pulse',
+    disconnected: 'bg-slate-500',
+    reconnecting: 'bg-yellow-500 animate-pulse',
+    error: 'bg-red-500',
+  };
+
+  const statusLabels = {
+    connected: 'MQTT Live',
+    connecting: 'Connecting...',
+    disconnected: 'Simulated',
+    reconnecting: 'Reconnecting...',
+    error: 'Connection Error',
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className={`w-2 h-2 rounded-full ${statusColors[status] || statusColors.disconnected}`} />
+      <span className="text-slate-400">{statusLabels[status] || 'Unknown'}</span>
+    </div>
+  );
+};
+
 export default function PatientDetailPage() {
   const params = useParams();
   const patient = initialPatients.find(p => p.id === parseInt(params.id)) || initialPatients[0];
@@ -160,35 +413,87 @@ export default function PatientDetailPage() {
     rr: { low: patient.limits.rr[0], high: patient.limits.rr[1] },
     temp: { low: 36.0, high: 38.0 },
   });
-  
+
+  // MQTT Vitals Hook - connects to real-time data stream
+  const {
+    vitals: mqttVitals,
+    connectionStatus,
+    isConnected: mqttConnected,
+    lastUpdate
+  } = useMQTTVitals(patient.id, {
+    enabled: true,
+    onAlarm: (alarm) => {
+      console.log('Alarm received:', alarm);
+      // Could trigger toast notification here
+    },
+  });
+
+  // Use MQTT vitals when connected, fall back to simulated
+  useEffect(() => {
+    if (mqttConnected && mqttVitals.spo2 !== null) {
+      setVitals(prev => ({
+        ...prev,
+        spo2: mqttVitals.spo2 || prev.spo2,
+        pr: mqttVitals.heartRate || prev.pr,
+        rr: mqttVitals.respiration || prev.rr,
+        temp: mqttVitals.temperature || prev.temp,
+        fio2: mqttVitals.fio2 || prev.fio2,
+        pi: mqttVitals.pi || prev.pi,
+      }));
+
+      // Update trend data with MQTT values
+      setTrendData(prev => ({
+        spo2: [...(prev.spo2 || []).slice(-59), { time: new Date().toISOString(), value: mqttVitals.spo2 }],
+        pr: [...(prev.pr || []).slice(-59), { time: new Date().toISOString(), value: mqttVitals.heartRate }],
+        rr: [...(prev.rr || []).slice(-59), { time: new Date().toISOString(), value: mqttVitals.respiration }],
+        temp: [...(prev.temp || []).slice(-59), { time: new Date().toISOString(), value: mqttVitals.temperature }],
+      }));
+    }
+  }, [mqttVitals, mqttConnected]);
+
   useEffect(() => {
     // Generate initial trend data
     const generateTrend = (base, variance) => {
-      return Array.from({ length: 100 }, (_, i) => ({
-        time: new Date(Date.now() - (100 - i) * 5 * 60000).toISOString(),
+      return Array.from({ length: 60 }, (_, i) => ({
+        time: new Date(Date.now() - (60 - i) * 2000).toISOString(),
         value: base + (Math.random() - 0.5) * variance * 2,
       }));
     };
-    
+
     setTrendData({
       spo2: generateTrend(patient.baseSPO2, 3),
       pr: generateTrend(patient.basePR, 8),
       rr: generateTrend(patient.baseRR, 5),
       temp: generateTrend(patient.baseTemp, 0.3),
     });
-    
-    // Update vitals every second
-    const interval = setInterval(() => {
-      setVitals(generateVitals(patient));
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, [patient]);
+
+    // Only use simulated data when MQTT is not connected
+    if (!mqttConnected) {
+      // Update vitals and trend data in real-time (fallback simulation)
+      const interval = setInterval(() => {
+        const newVitals = generateVitals(patient);
+        setVitals(newVitals);
+
+        // Add new point to each trend, keeping last 60 points
+        setTrendData(prev => ({
+          spo2: [...(prev.spo2 || []).slice(-59), { time: new Date().toISOString(), value: parseFloat(newVitals.spo2) || patient.baseSPO2 }],
+          pr: [...(prev.pr || []).slice(-59), { time: new Date().toISOString(), value: parseFloat(newVitals.pr) || patient.basePR }],
+          rr: [...(prev.rr || []).slice(-59), { time: new Date().toISOString(), value: parseFloat(newVitals.rr) || patient.baseRR }],
+          temp: [...(prev.temp || []).slice(-59), { time: new Date().toISOString(), value: parseFloat(newVitals.temp) || patient.baseTemp }],
+        }));
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [patient, mqttConnected]);
   
   return (
     <AppShell>
       <div className="p-4">
-        <PatientHeader patient={patient} />
+        <div className="flex items-center justify-between mb-2">
+          <PatientHeader patient={patient} />
+          <MQTTStatusIndicator status={connectionStatus} />
+        </div>
         <PatientTabs patientId={patient.id} />
         
         <div className="grid grid-cols-12 gap-4">
@@ -252,11 +557,16 @@ export default function PatientDetailPage() {
                     <span className="text-lg text-slate-500">bpm</span>
                   </div>
                   <div className="h-16">
-                    <TrendChart data={trendData.pr || []} color="#00FFFF" />
+                    <TrendChart
+                      color="#00FFFF"
+                      baseValue={patient.basePR}
+                      variance={8}
+                      limits={patient.limits.pr}
+                    />
                   </div>
                 </div>
               </div>
-              
+
               {/* RR */}
               <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 bg-black/30 border-b border-slate-800">
@@ -272,11 +582,16 @@ export default function PatientDetailPage() {
                     <span className="text-lg text-slate-500">/min</span>
                   </div>
                   <div className="h-16">
-                    <TrendChart data={trendData.rr || []} color="#FFFF00" />
+                    <TrendChart
+                      color="#FFFF00"
+                      baseValue={patient.baseRR}
+                      variance={5}
+                      limits={patient.limits.rr}
+                    />
                   </div>
                 </div>
               </div>
-              
+
               {/* Temp */}
               <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 bg-black/30 border-b border-slate-800">
@@ -289,7 +604,12 @@ export default function PatientDetailPage() {
                     <span className="text-lg text-slate-500">°C</span>
                   </div>
                   <div className="h-16">
-                    <TrendChart data={trendData.temp || []} color="#FF99FF" />
+                    <TrendChart
+                      color="#FF99FF"
+                      baseValue={patient.baseTemp}
+                      variance={0.3}
+                      limits={[36.0, 38.0]}
+                    />
                   </div>
                 </div>
               </div>
