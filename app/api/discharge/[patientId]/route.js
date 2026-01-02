@@ -7,42 +7,50 @@ import logger, { createTimer } from '@/lib/logger';
 import { rateLimit, getClientIP, sanitizeInput, requireAuth, requireRole, ROLE_GROUPS } from '@/lib/security';
 import { createAuditLog } from '@/lib/audit';
 
-// Default AAP discharge checklist items
+// Default AAP discharge checklist items (using Prisma enum values)
 const DEFAULT_CHECKLIST_ITEMS = [
-  // Physiologic stability
-  { category: 'medical', description: 'Temperature stable in open crib for 24-48 hours', required: true, orderIndex: 1 },
-  { category: 'medical', description: 'No apnea/bradycardia/desaturation events for 5-8 days', required: true, orderIndex: 2 },
-  { category: 'medical', description: 'Stable respiratory support (room air or home O2 qualified)', required: true, orderIndex: 3 },
-  { category: 'medical', description: 'Consistent weight gain (20-30 g/day)', required: true, orderIndex: 4 },
-  { category: 'medical', description: 'Full oral feeds (PO or stable G-tube)', required: true, orderIndex: 5 },
-  { category: 'medical', description: 'Adequate urine output (6-8 wet diapers/day)', required: true, orderIndex: 6 },
-  // Medical screenings
-  { category: 'medical', description: 'Newborn metabolic screen complete', required: true, orderIndex: 7 },
-  { category: 'medical', description: 'Hearing screen passed (both ears)', required: true, orderIndex: 8 },
-  { category: 'medical', description: 'ROP screening: cleared or follow-up scheduled', required: true, orderIndex: 9 },
-  { category: 'medical', description: 'Cranial ultrasound complete (if indicated)', required: false, orderIndex: 10 },
-  { category: 'medical', description: 'Immunizations up to date', required: true, orderIndex: 11 },
-  { category: 'medical', description: 'Car seat challenge passed (90 min observation)', required: true, orderIndex: 12 },
-  { category: 'medical', description: 'Hepatitis B vaccine given', required: true, orderIndex: 13 },
-  { category: 'medical', description: 'RSV prophylaxis discussed (if eligible)', required: false, orderIndex: 14 },
+  // Physiologic stability (MEDICAL_STABILITY)
+  { category: 'MEDICAL_STABILITY', description: 'Temperature stable in open crib for 24-48 hours', required: true, orderIndex: 1 },
+  { category: 'MEDICAL_STABILITY', description: 'No apnea/bradycardia/desaturation events for 5-8 days', required: true, orderIndex: 2 },
+  { category: 'MEDICAL_STABILITY', description: 'Stable respiratory support (room air or home O2 qualified)', required: true, orderIndex: 3 },
+  { category: 'MEDICAL_STABILITY', description: 'Consistent weight gain (20-30 g/day)', required: true, orderIndex: 4 },
+  // Feeding & Nutrition
+  { category: 'FEEDING_NUTRITION', description: 'Full oral feeds (PO or stable G-tube)', required: true, orderIndex: 5 },
+  { category: 'FEEDING_NUTRITION', description: 'Adequate urine output (6-8 wet diapers/day)', required: true, orderIndex: 6 },
+  // Hearing screening
+  { category: 'HEARING_SCREENING', description: 'Hearing screen passed (both ears)', required: true, orderIndex: 7 },
+  // Immunizations
+  { category: 'IMMUNIZATIONS', description: 'Newborn metabolic screen complete', required: true, orderIndex: 8 },
+  { category: 'IMMUNIZATIONS', description: 'Immunizations up to date', required: true, orderIndex: 9 },
+  { category: 'IMMUNIZATIONS', description: 'Hepatitis B vaccine given', required: true, orderIndex: 10 },
+  { category: 'IMMUNIZATIONS', description: 'RSV prophylaxis discussed (if eligible)', required: false, orderIndex: 11 },
+  // Medical screenings (OTHER category for misc medical)
+  { category: 'OTHER', description: 'ROP screening: cleared or follow-up scheduled', required: true, orderIndex: 12 },
+  { category: 'OTHER', description: 'Cranial ultrasound complete (if indicated)', required: false, orderIndex: 13 },
+  // Car seat safety
+  { category: 'CAR_SEAT_SAFETY', description: 'Car seat challenge passed (90 min observation)', required: true, orderIndex: 14 },
   // Family education
-  { category: 'education', description: 'Infant CPR training completed', required: true, orderIndex: 15 },
-  { category: 'education', description: 'Feeding demonstration (breast/bottle/tube)', required: true, orderIndex: 16 },
-  { category: 'education', description: 'Medication administration training', required: true, orderIndex: 17 },
-  { category: 'education', description: 'Equipment training (monitors, O2, feeding pump)', required: false, orderIndex: 18 },
-  { category: 'education', description: 'Safe sleep education (Back to Sleep)', required: true, orderIndex: 19 },
-  { category: 'education', description: 'Shaken baby prevention education', required: true, orderIndex: 20 },
-  { category: 'safety', description: 'Home environment assessed (smoke-free, safe)', required: true, orderIndex: 21 },
-  { category: 'education', description: 'Signs of illness teaching (when to call/go to ED)', required: true, orderIndex: 22 },
-  // Administrative
-  { category: 'followup', description: 'Primary care provider identified', required: true, orderIndex: 23 },
-  { category: 'documentation', description: 'Insurance verified/Medicaid enrolled', required: true, orderIndex: 24 },
-  { category: 'documentation', description: 'Discharge summary completed', required: true, orderIndex: 25 },
-  { category: 'documentation', description: 'Prescriptions written and filled', required: true, orderIndex: 26 },
-  { category: 'equipment', description: 'Home nursing arranged (if needed)', required: false, orderIndex: 27 },
-  { category: 'followup', description: 'Follow-up appointments scheduled', required: true, orderIndex: 28 },
-  { category: 'followup', description: 'Early Intervention referral (if indicated)', required: false, orderIndex: 29 },
-  { category: 'documentation', description: 'Birth certificate completed', required: true, orderIndex: 30 },
+  { category: 'FAMILY_EDUCATION', description: 'Infant CPR training completed', required: true, orderIndex: 15 },
+  { category: 'FAMILY_EDUCATION', description: 'Feeding demonstration (breast/bottle/tube)', required: true, orderIndex: 16 },
+  { category: 'FAMILY_EDUCATION', description: 'Medication administration training', required: true, orderIndex: 17 },
+  { category: 'FAMILY_EDUCATION', description: 'Equipment training (monitors, O2, feeding pump)', required: false, orderIndex: 18 },
+  { category: 'FAMILY_EDUCATION', description: 'Safe sleep education (Back to Sleep)', required: true, orderIndex: 19 },
+  { category: 'FAMILY_EDUCATION', description: 'Shaken baby prevention education', required: true, orderIndex: 20 },
+  { category: 'FAMILY_EDUCATION', description: 'Signs of illness teaching (when to call/go to ED)', required: true, orderIndex: 21 },
+  // Social services (home assessment)
+  { category: 'SOCIAL_SERVICES', description: 'Home environment assessed (smoke-free, safe)', required: true, orderIndex: 22 },
+  // Follow-up
+  { category: 'FOLLOW_UP', description: 'Primary care provider identified', required: true, orderIndex: 23 },
+  { category: 'FOLLOW_UP', description: 'Follow-up appointments scheduled', required: true, orderIndex: 24 },
+  { category: 'FOLLOW_UP', description: 'Early Intervention referral (if indicated)', required: false, orderIndex: 25 },
+  // Documentation
+  { category: 'DOCUMENTATION', description: 'Insurance verified/Medicaid enrolled', required: true, orderIndex: 26 },
+  { category: 'DOCUMENTATION', description: 'Discharge summary completed', required: true, orderIndex: 27 },
+  { category: 'DOCUMENTATION', description: 'Birth certificate completed', required: true, orderIndex: 28 },
+  // Medications
+  { category: 'MEDICATIONS', description: 'Prescriptions written and filled', required: true, orderIndex: 29 },
+  // Equipment/DME
+  { category: 'EQUIPMENT_DME', description: 'Home nursing arranged (if needed)', required: false, orderIndex: 30 },
 ];
 
 // GET /api/discharge/[patientId] - Get discharge plan for a patient

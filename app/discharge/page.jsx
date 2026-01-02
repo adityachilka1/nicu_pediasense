@@ -25,7 +25,9 @@ export default function DischargePage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to fetch patients');
+        const errorMsg = errorData.error?.message || errorData.message ||
+                        (typeof errorData.error === 'string' ? errorData.error : 'Failed to fetch patients');
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
@@ -243,6 +245,25 @@ export default function DischargePage() {
     return applicable.length > 0 ? Math.round((complete.length / applicable.length) * 100) : 0;
   };
 
+  // Format category enum to display name
+  const formatCategoryName = (category) => {
+    const names = {
+      'MEDICAL_STABILITY': 'Medical Stability',
+      'FEEDING_NUTRITION': 'Feeding & Nutrition',
+      'FAMILY_EDUCATION': 'Family Education',
+      'FOLLOW_UP': 'Follow-up Care',
+      'EQUIPMENT_DME': 'Equipment/DME',
+      'MEDICATIONS': 'Medications',
+      'CAR_SEAT_SAFETY': 'Car Seat Safety',
+      'HEARING_SCREENING': 'Hearing Screening',
+      'IMMUNIZATIONS': 'Immunizations',
+      'DOCUMENTATION': 'Documentation',
+      'SOCIAL_SERVICES': 'Social Services',
+      'OTHER': 'Other',
+    };
+    return names[category] || category.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   if (loading) {
     return (
       <AppShell>
@@ -364,10 +385,10 @@ export default function DischargePage() {
                 {/* Overview Cards */}
                 <div className="grid grid-cols-4 gap-4">
                   {[
-                    { title: 'Medical', key: 'medical', color: 'cyan' },
-                    { title: 'Education', key: 'education', color: 'purple' },
-                    { title: 'Safety', key: 'safety', color: 'green' },
-                    { title: 'Follow-up', key: 'followup', color: 'yellow' },
+                    { title: 'Medical', key: 'MEDICAL_STABILITY', color: 'cyan' },
+                    { title: 'Education', key: 'FAMILY_EDUCATION', color: 'purple' },
+                    { title: 'Follow-up', key: 'FOLLOW_UP', color: 'green' },
+                    { title: 'Documentation', key: 'DOCUMENTATION', color: 'yellow' },
                   ].map((category) => (
                     <div key={category.title} className="bg-slate-800 rounded-xl p-4 border border-slate-700">
                       <div className="text-sm text-slate-400 mb-2">{category.title}</div>
@@ -431,7 +452,7 @@ export default function DischargePage() {
                   {dischargePlan?.groupedItems && Object.entries(dischargePlan.groupedItems).map(([category, items]) => (
                     <div key={category} className="bg-slate-800 rounded-xl border border-slate-700">
                       <div className="p-4 border-b border-slate-700">
-                        <h3 className="font-semibold text-white capitalize">{category} Criteria</h3>
+                        <h3 className="font-semibold text-white">{formatCategoryName(category)}</h3>
                       </div>
                       <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
                         {items.map((item) => (
