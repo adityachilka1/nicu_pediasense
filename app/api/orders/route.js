@@ -360,14 +360,28 @@ export const PUT = withErrorHandler(async (request) => {
   const updateData = {};
 
   if (status) {
-    const validStatuses = ['pending', 'active', 'completed', 'discontinued', 'cancelled'];
-    if (!validStatuses.includes(status)) {
+    // Map status to uppercase Prisma enum
+    const statusEnumMap = {
+      pending: 'PENDING',
+      active: 'ACTIVE',
+      completed: 'COMPLETED',
+      discontinued: 'DISCONTINUED',
+      cancelled: 'CANCELLED',
+      PENDING: 'PENDING',
+      ACTIVE: 'ACTIVE',
+      COMPLETED: 'COMPLETED',
+      DISCONTINUED: 'DISCONTINUED',
+      CANCELLED: 'CANCELLED',
+    };
+    const mappedStatus = statusEnumMap[status] || status.toUpperCase();
+    const validStatuses = ['PENDING', 'ACTIVE', 'COMPLETED', 'DISCONTINUED', 'CANCELLED'];
+    if (!validStatuses.includes(mappedStatus)) {
       throw new ValidationError([{ field: 'status', message: 'Invalid status' }]);
     }
-    updateData.status = status;
+    updateData.status = mappedStatus;
 
     // Track discontinuation
-    if (status === 'discontinued') {
+    if (mappedStatus === 'DISCONTINUED') {
       updateData.discontinuedAt = new Date();
       updateData.discontinuedById = parseInt(session.user.id);
       if (discontinueReason) {

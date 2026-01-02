@@ -5,14 +5,40 @@ import { withErrorHandler, ValidationError, NotFoundError } from '@/lib/errors';
 import logger, { createTimer } from '@/lib/logger';
 import { rateLimit, getClientIP, sanitizeInput, requireRole } from '@/lib/security';
 
-// Valid order status transitions
+// Valid order status transitions (using Prisma enum values - uppercase)
 const STATUS_TRANSITIONS = {
-  pending: ['active', 'cancelled'],
-  active: ['completed', 'discontinued'],
-  completed: [], // Terminal state
-  discontinued: [], // Terminal state
-  cancelled: [], // Terminal state
+  PENDING: ['ACTIVE', 'CANCELLED'],
+  VERIFIED: ['ACTIVE', 'CANCELLED'],
+  ACTIVE: ['COMPLETED', 'DISCONTINUED', 'IN_PROGRESS'],
+  IN_PROGRESS: ['COMPLETED', 'DISCONTINUED'],
+  COMPLETED: [], // Terminal state
+  DISCONTINUED: [], // Terminal state
+  CANCELLED: [], // Terminal state
+  EXPIRED: [], // Terminal state
 };
+
+// Map lowercase status input to uppercase Prisma enum
+function mapStatusToEnum(status) {
+  const statusMap = {
+    pending: 'PENDING',
+    verified: 'VERIFIED',
+    active: 'ACTIVE',
+    in_progress: 'IN_PROGRESS',
+    completed: 'COMPLETED',
+    discontinued: 'DISCONTINUED',
+    cancelled: 'CANCELLED',
+    expired: 'EXPIRED',
+    PENDING: 'PENDING',
+    VERIFIED: 'VERIFIED',
+    ACTIVE: 'ACTIVE',
+    IN_PROGRESS: 'IN_PROGRESS',
+    COMPLETED: 'COMPLETED',
+    DISCONTINUED: 'DISCONTINUED',
+    CANCELLED: 'CANCELLED',
+    EXPIRED: 'EXPIRED',
+  };
+  return statusMap[status] || status?.toUpperCase();
+}
 
 // PUT /api/orders/[id]/status - Update order status
 export const PUT = withErrorHandler(async (request, { params }) => {
@@ -41,9 +67,11 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     throw new ValidationError([{ field: 'status', message: 'Status is required' }]);
   }
 
-  const validStatuses = ['pending', 'active', 'completed', 'discontinued', 'cancelled'];
-  if (!validStatuses.includes(status)) {
-    throw new ValidationError([{ field: 'status', message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` }]);
+  // Map status to uppercase Prisma enum value
+  const mappedStatus = mapStatusToEnum(status);
+  const validStatuses = ['PENDING', 'VERIFIED', 'ACTIVE', 'IN_PROGRESS', 'COMPLETED', 'DISCONTINUED', 'CANCELLED', 'EXPIRED'];
+  if (!validStatuses.includes(mappedStatus)) {
+    throw new ValidationError([{ field: 'status', message: `Invalid status. Must be one of: pending, active, completed, discontinued, cancelled` }]);
   }
 
   // Find the existing order
@@ -62,17 +90,17 @@ export const PUT = withErrorHandler(async (request, { params }) => {
 
   // Validate status transition
   const allowedTransitions = STATUS_TRANSITIONS[existingOrder.status] || [];
-  if (!allowedTransitions.includes(status)) {
+  if (!allowedTransitions.includes(mappedStatus)) {
     throw new ValidationError([{
       field: 'status',
-      message: `Cannot transition from '${existingOrder.status}' to '${status}'. Allowed transitions: ${allowedTransitions.join(', ') || 'none'}`,
+      message: `Cannot transition from '${existingOrder.status}' to '${mappedStatus}'. Allowed transitions: ${allowedTransitions.join(', ') || 'none'}`,
     }]);
   }
 
-  // Prepare update data
-  const updateData = { status };
+  // Prepare update data with mapped status
+  const updateData = { status: mappedStatus };
 
-  if (status === 'discontinued') {
+  if (mappedStatus === 'DISCONTINUED') {
     updateData.discontinuedAt = new Date();
     updateData.discontinuedById = parseInt(session.user.id);
     if (discontinueReason) {
@@ -80,11 +108,11 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     }
   }
 
-  if (status === 'active' && !existingOrder.startTime) {
+  if (mappedStatus === 'ACTIVE' && !existingOrder.startTime) {
     updateData.startTime = new Date();
   }
 
-  if (status === 'completed') {
+  if (mappedStatus === 'COMPLETED') {
     updateData.endTime = new Date();
   }
 
