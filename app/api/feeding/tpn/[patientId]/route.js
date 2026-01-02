@@ -43,7 +43,9 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'api');
 
-  const patientId = parseInt(params.patientId, 10);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId, 10);
   if (isNaN(patientId) || patientId <= 0) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -86,8 +88,8 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const activeTPNOrders = await prisma.order.findMany({
     where: {
       patientId,
-      category: 'diet',
-      status: 'active',
+      category: 'DIET',
+      status: 'ACTIVE',
       name: { contains: 'TPN' },
     },
     orderBy: { createdAt: 'desc' },
@@ -148,7 +150,9 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  const patientId = parseInt(params.patientId, 10);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId, 10);
   if (isNaN(patientId) || patientId <= 0) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -194,8 +198,8 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   await prisma.order.updateMany({
     where: {
       patientId,
-      category: 'diet',
-      status: 'active',
+      category: 'DIET',
+      status: 'ACTIVE',
       name: { contains: 'TPN' },
     },
     data: {

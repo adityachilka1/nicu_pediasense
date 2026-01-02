@@ -50,17 +50,20 @@ export const GET = withErrorHandler(async (request) => {
 
   const { searchParams } = new URL(request.url);
 
-  // Parse and validate query parameters
-  const queryResult = feedingQuerySchema.safeParse({
+  // Build query object, filtering out null values (searchParams.get returns null for missing params)
+  const queryObj = {
     patientId: searchParams.get('patientId'),
-    limit: searchParams.get('limit'),
-    startDate: searchParams.get('startDate'),
-    endDate: searchParams.get('endDate'),
-    feedingType: searchParams.get('feedingType'),
-  });
+  };
+  if (searchParams.get('limit')) queryObj.limit = searchParams.get('limit');
+  if (searchParams.get('startDate')) queryObj.startDate = searchParams.get('startDate');
+  if (searchParams.get('endDate')) queryObj.endDate = searchParams.get('endDate');
+  if (searchParams.get('feedingType')) queryObj.feedingType = searchParams.get('feedingType');
+
+  // Parse and validate query parameters
+  const queryResult = feedingQuerySchema.safeParse(queryObj);
 
   if (!queryResult.success) {
-    const errors = queryResult.error?.errors || [];
+    const errors = queryResult.error?.errors || queryResult.error?.issues || [];
     throw new ValidationError(
       errors.map(err => ({
         field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || 'unknown'),
@@ -108,7 +111,15 @@ export const GET = withErrorHandler(async (request) => {
   }
 
   if (feedingType) {
-    where.feedingType = feedingType;
+    // Map lowercase input to uppercase Prisma enum values
+    const feedingTypeMap = {
+      breast: 'BREAST_MILK',
+      formula: 'FORMULA',
+      fortified: 'FORTIFIED_BREAST_MILK',
+      tpn: 'TPN',
+      enteral: 'MIXED',
+    };
+    where.feedingType = feedingTypeMap[feedingType] || feedingType.toUpperCase();
   }
 
   // Fetch feeding logs
@@ -194,13 +205,13 @@ export const POST = withErrorHandler(async (request) => {
 
   const {
     patientId,
-    feedingType,
-    route,
+    feedingType: inputFeedingType,
+    route: inputRoute,
     volumeOrdered,
     volumeGiven,
     volumeResidual,
-    residualColor,
-    tolerance,
+    residualColor: inputResidualColor,
+    tolerance: inputTolerance,
     emesis,
     emesisAmount,
     fortified,
@@ -209,6 +220,38 @@ export const POST = withErrorHandler(async (request) => {
     recordedBy,
     recordedAt,
   } = validationResult.data;
+
+  // Map lowercase values to uppercase Prisma enum values
+  const feedingTypeMap = {
+    breast: 'BREAST_MILK',
+    formula: 'FORMULA',
+    fortified: 'FORTIFIED_BREAST_MILK',
+    tpn: 'TPN',
+    enteral: 'MIXED',
+  };
+  const feedingType = feedingTypeMap[inputFeedingType] || inputFeedingType.toUpperCase();
+
+  const routeMap = {
+    oral: 'ORAL',
+    ng: 'NG_TUBE',
+    og: 'OG_TUBE',
+    gt: 'GT_TUBE',
+    nj: 'NJ_TUBE',
+    iv: 'IV',
+  };
+  const route = routeMap[inputRoute] || inputRoute.toUpperCase();
+
+  // residualColor is stored as a String, not an enum - pass through as-is
+  const residualColor = inputResidualColor || null;
+
+  const toleranceMap = {
+    excellent: 'EXCELLENT',
+    good: 'GOOD',
+    fair: 'FAIR',
+    poor: 'POOR',
+    intolerant: 'INTOLERANT',
+  };
+  const tolerance = inputTolerance ? (toleranceMap[inputTolerance] || inputTolerance.toUpperCase()) : null;
 
   // Verify patient exists
   const patient = await prisma.patient.findUnique({

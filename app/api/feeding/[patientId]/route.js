@@ -32,24 +32,28 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'api');
 
-  const patientId = parseInt(params.patientId, 10);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId, 10);
   if (isNaN(patientId) || patientId <= 0) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
 
-  // Parse query params
+  // Parse query params - only include non-null values
   const { searchParams } = new URL(request.url);
-  const queryResult = querySchema.safeParse({
-    startDate: searchParams.get('startDate'),
-    endDate: searchParams.get('endDate'),
-    limit: searchParams.get('limit'),
-  });
+  const queryObj = {};
+  if (searchParams.get('startDate')) queryObj.startDate = searchParams.get('startDate');
+  if (searchParams.get('endDate')) queryObj.endDate = searchParams.get('endDate');
+  if (searchParams.get('limit')) queryObj.limit = searchParams.get('limit');
+
+  const queryResult = querySchema.safeParse(queryObj);
 
   if (!queryResult.success) {
+    const errors = queryResult.error?.errors || queryResult.error?.issues || [];
     throw new ValidationError(
-      queryResult.error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
+      errors.map(err => ({
+        field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || 'unknown'),
+        message: err.message || 'Validation error',
       }))
     );
   }
@@ -258,7 +262,11 @@ function calculateFeedingSummary(feedingLogs, flowsheetEntries, currentWeightKg)
   // Calculate GIR (Glucose Infusion Rate) - mg/kg/min
   // GIR = (Dextrose concentration % x Rate mL/hr) / (Weight kg x 6)
   // Using hourly rate approximation from 24h data
-  const hoursOfData = Math.max(1, (Date.now() - Math.min(...feedingLogs.map(f => new Date(f.recordedAt).getTime()))) / (1000 * 60 * 60));
+  let hoursOfData = 24; // Default to 24 hours
+  if (feedingLogs.length > 0) {
+    const oldestFeedTime = Math.min(...feedingLogs.map(f => new Date(f.recordedAt).getTime()));
+    hoursOfData = Math.max(1, (Date.now() - oldestFeedTime) / (1000 * 60 * 60));
+  }
   const hourlyTPNRate = totalTPNVolume / hoursOfData;
   const dextroseConcentration = 12.5; // Assume D12.5%
   const gir = Math.round(((dextroseConcentration * hourlyTPNRate) / (weightKg * 6)) * 10) / 10;
@@ -294,12 +302,19 @@ function getCaloriesPerMl(feedingType, fortified, specifiedCalories) {
   // Default calorie densities
   switch (feedingType) {
     case 'breast':
+    case 'BREAST_MILK':
+    case 'DONOR_MILK':
       return fortified ? 0.8 : 0.67; // 24 kcal/oz vs 20 kcal/oz
     case 'fortified':
+    case 'FORTIFIED_BREAST_MILK':
       return 0.8; // 24 kcal/oz
     case 'formula':
+    case 'FORMULA':
       return 0.67; // 20 kcal/oz (standard)
+    case 'FORTIFIED_FORMULA':
+      return 0.8; // 24 kcal/oz
     case 'enteral':
+    case 'MIXED':
       return fortified ? 0.8 : 0.67;
     default:
       return 0.67;
@@ -340,7 +355,7 @@ function extractTPNSettings(flowsheetEntries, currentWeightKg) {
  */
 function calculateBreastMilkInventory(feedingLogs) {
   const breastMilkFeeds = feedingLogs.filter(f =>
-    f.feedingType === 'breast' || f.feedingType === 'fortified'
+    f.feedingType === 'BREAST_MILK' || f.feedingType === 'FORTIFIED_BREAST_MILK' || f.feedingType === 'DONOR_MILK'
   );
 
   const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -384,8 +399,13 @@ function determinePrimaryMilkType(feedingLogs) {
   if (!maxType) return 'EBM';
 
   switch (maxType[0]) {
+    case 'FORMULA':
+    case 'FORTIFIED_FORMULA':
     case 'formula': return 'Formula';
+    case 'BREAST_MILK':
+    case 'DONOR_MILK':
     case 'breast': return 'EBM';
+    case 'FORTIFIED_BREAST_MILK':
     case 'fortified': return 'EBM';
     default: return 'EBM';
   }
@@ -423,6 +443,13 @@ function mapFeedingTypeToDisplay(type) {
     fortified: 'Enteral',
     enteral: 'Enteral',
     tpn: 'Parenteral',
+    BREAST_MILK: 'Enteral',
+    DONOR_MILK: 'Enteral',
+    FORMULA: 'Enteral',
+    FORTIFIED_BREAST_MILK: 'Enteral',
+    FORTIFIED_FORMULA: 'Enteral',
+    TPN: 'Parenteral',
+    MIXED: 'Enteral',
   };
   return map[type] || 'Enteral';
 }
@@ -433,6 +460,11 @@ function mapRouteToDisplay(route) {
     ng: 'Gavage',
     og: 'Gavage',
     gt: 'GT',
+    ORAL: 'PO',
+    NG: 'Gavage',
+    OG: 'Gavage',
+    GT: 'GT',
+    NJ: 'NJ',
   };
   return map[route] || route?.toUpperCase() || 'Gavage';
 }
@@ -440,11 +472,17 @@ function mapRouteToDisplay(route) {
 function mapMilkTypeToDisplay(feedingType, fortified) {
   switch (feedingType) {
     case 'breast':
+    case 'BREAST_MILK':
+    case 'DONOR_MILK':
       return fortified ? 'EBM+HMF' : 'EBM';
     case 'fortified':
+    case 'FORTIFIED_BREAST_MILK':
       return 'EBM+HMF';
     case 'formula':
+    case 'FORMULA':
       return 'Formula';
+    case 'FORTIFIED_FORMULA':
+      return 'Formula+';
     default:
       return fortified ? 'EBM+HMF' : 'EBM';
   }
