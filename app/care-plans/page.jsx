@@ -90,7 +90,8 @@ export default function CarePlansPage() {
         params.append('patientId', selectedPatient.id);
       }
       if (activeTab !== 'templates') {
-        params.append('status', activeTab);
+        // Send uppercase status to match Prisma enum
+        params.append('status', activeTab.toUpperCase());
       }
       params.append('includeItems', 'true');
 
