@@ -62,19 +62,29 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     throw new NotFoundError('Care plan task');
   }
 
+  // Map status to Prisma enum
+  const statusMap = {
+    'pending': 'PENDING',
+    'in_progress': 'IN_PROGRESS',
+    'completed': 'COMPLETED',
+    'skipped': 'SKIPPED',
+    'deferred': 'DEFERRED',
+  };
+  const mappedStatus = statusMap[validation.data.status?.toLowerCase()] || validation.data.status?.toUpperCase();
+
   // Prepare update data
   const updateData = {
-    status: validation.data.status,
+    status: mappedStatus,
   };
 
   if (validation.data.notes !== undefined) {
     updateData.notes = validation.data.notes;
   }
 
-  if (validation.data.status === 'completed') {
+  if (validation.data.status?.toLowerCase() === 'completed') {
     updateData.completedAt = new Date();
     updateData.completedById = parseInt(session.user.id);
-  } else if (validation.data.status === 'pending') {
+  } else if (validation.data.status?.toLowerCase() === 'pending') {
     // If resetting to pending, clear completion data
     updateData.completedAt = null;
     updateData.completedById = null;
@@ -96,7 +106,7 @@ export const PUT = withErrorHandler(async (request, { params }) => {
       tx.carePlanItem.count({
         where: {
           carePlanId,
-          status: { notIn: ['completed', 'skipped'] },
+          status: { notIn: ['COMPLETED', 'SKIPPED'] },
         },
       }),
     ]);
@@ -105,11 +115,11 @@ export const PUT = withErrorHandler(async (request, { params }) => {
 
     // Auto-complete care plan if all items are done
     let carePlanCompleted = false;
-    if (allCompleted && existingTask.carePlan.status === 'active') {
+    if (allCompleted && existingTask.carePlan.status === 'ACTIVE') {
       await tx.carePlan.update({
         where: { id: carePlanId },
         data: {
-          status: 'completed',
+          status: 'COMPLETED',
           completedAt: new Date(),
         },
       });

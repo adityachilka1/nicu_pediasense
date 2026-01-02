@@ -415,6 +415,39 @@ export const POST = withErrorHandler(async (request) => {
     throw new ValidationError([{ field: 'patientId', message: 'Patient not found' }]);
   }
 
+  // Maps for enum values
+  const categoryMap = {
+    'respiratory': 'RESPIRATORY',
+    'nutrition': 'NUTRITION',
+    'neuro': 'NEUROLOGICAL',
+    'infection': 'INFECTION',
+    'growth': 'GROWTH_DEVELOPMENT',
+    'skin': 'SKIN_WOUND',
+    'family': 'FAMILY_SUPPORT',
+    'pain': 'PAIN_MANAGEMENT',
+    'developmental': 'DEVELOPMENTAL',
+    'discharge': 'DISCHARGE_PLANNING',
+    'other': 'OTHER',
+  };
+
+  const priorityMap = {
+    'high': 'HIGH',
+    'medium': 'MEDIUM',
+    'low': 'LOW',
+  };
+
+  const itemTypeMap = {
+    'task': 'TASK',
+    'assessment': 'ASSESSMENT',
+    'intervention': 'INTERVENTION',
+    'education': 'EDUCATION',
+    'monitoring': 'MONITORING',
+    'consultation': 'CONSULTATION',
+  };
+
+  const mappedCategory = categoryMap[template.category?.toLowerCase()] || 'OTHER';
+  const mappedPriority = priorityMap[priority?.toLowerCase()] || 'MEDIUM';
+
   // Create care plan from template
   const carePlan = await prisma.$transaction(async (tx) => {
     // Create the care plan
@@ -423,11 +456,11 @@ export const POST = withErrorHandler(async (request) => {
         patientId: patientIdNum,
         createdById: parseInt(session.user.id),
         title: customTitle || template.name,
-        category: template.category,
+        category: mappedCategory,
         description: template.description,
         goals: JSON.stringify([`Complete ${template.name} protocol`]),
-        priority: priority || 'medium',
-        status: 'active',
+        priority: mappedPriority,
+        status: 'ACTIVE',
       },
     });
 
@@ -438,8 +471,8 @@ export const POST = withErrorHandler(async (request) => {
         allTasks.push({
           carePlanId: plan.id,
           description: `[${phase.name}] ${task.description}`,
-          itemType: task.itemType || 'task',
-          status: 'pending',
+          itemType: itemTypeMap[task.itemType?.toLowerCase()] || 'TASK',
+          status: 'PENDING',
         });
       }
     }

@@ -7,6 +7,12 @@ import AppShell from '@/components/AppShell';
 import { useToast } from '@/components/Toast';
 import { ConfirmModal } from '@/components/Modal';
 
+// Helper to extract error message from API response
+const getErrorMessage = (errorData, fallback) => {
+  return errorData?.error?.message || errorData?.message ||
+    (typeof errorData?.error === 'string' ? errorData.error : fallback);
+};
+
 // Helper function for status colors
 const getStatusColor = (status) => {
   switch (status) {
@@ -54,7 +60,8 @@ export default function HandoffPage() {
       const response = await fetch(`/api/handoff/current?shift=${selectedShift}`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch handoff data');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(getErrorMessage(errorData, 'Failed to fetch handoff data'));
       }
 
       const result = await response.json();
@@ -133,7 +140,8 @@ export default function HandoffPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save handoff note');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(getErrorMessage(errorData, 'Failed to save handoff note'));
       }
 
       const result = await response.json();
@@ -150,7 +158,7 @@ export default function HandoffPage() {
       toast.success('Handoff note saved');
     } catch (error) {
       console.error('Error saving handoff note:', error);
-      toast.error('Failed to save handoff note');
+      toast.error(error.message || 'Failed to save handoff note');
     }
   };
 
@@ -201,7 +209,8 @@ export default function HandoffPage() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to save handoff for patient ${patient.id}`);
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(getErrorMessage(errorData, `Failed to save handoff for patient ${patient.id}`));
         }
 
         return response.json();
@@ -216,7 +225,7 @@ export default function HandoffPage() {
       await fetchHandoffData();
     } catch (error) {
       console.error('Error submitting handoffs:', error);
-      toast.error('Failed to submit handoff notes');
+      toast.error(error.message || 'Failed to submit handoff notes');
     } finally {
       setSaving(false);
     }
@@ -245,7 +254,8 @@ export default function HandoffPage() {
           });
 
           if (!response.ok) {
-            throw new Error(`Failed to acknowledge handoff for note ${note.id}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(getErrorMessage(errorData, `Failed to acknowledge handoff for note ${note.id}`));
           }
 
           return response.json();

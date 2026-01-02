@@ -54,8 +54,8 @@ export const GET = withErrorHandler(async (request, { params }) => {
     throw new NotFoundError('Care plan');
   }
 
-  // Calculate progress
-  const completedCount = carePlan.items.filter(i => i.status === 'completed' || i.status === 'skipped').length;
+  // Calculate progress (use uppercase enum values)
+  const completedCount = carePlan.items.filter(i => i.status === 'COMPLETED' || i.status === 'SKIPPED').length;
   const progress = carePlan.items.length > 0 ? Math.round((completedCount / carePlan.items.length) * 100) : 0;
 
   logger.info('Fetched care plan', {
@@ -112,12 +112,28 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     throw new NotFoundError('Care plan');
   }
 
+  // Maps for enum values
+  const priorityMap = {
+    'high': 'HIGH',
+    'medium': 'MEDIUM',
+    'low': 'LOW',
+  };
+  const statusMap = {
+    'active': 'ACTIVE',
+    'on_hold': 'ON_HOLD',
+    'completed': 'COMPLETED',
+    'discontinued': 'DISCONTINUED',
+    'archived': 'ARCHIVED',
+  };
+
   // Prepare update data
   const updateData = {};
 
   if (validation.data.title !== undefined) updateData.title = validation.data.title;
   if (validation.data.description !== undefined) updateData.description = validation.data.description;
-  if (validation.data.priority !== undefined) updateData.priority = validation.data.priority;
+  if (validation.data.priority !== undefined) {
+    updateData.priority = priorityMap[validation.data.priority?.toLowerCase()] || validation.data.priority?.toUpperCase();
+  }
   if (validation.data.targetDate !== undefined) {
     updateData.targetDate = validation.data.targetDate ? new Date(validation.data.targetDate) : null;
   }
@@ -125,8 +141,8 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     updateData.goals = JSON.stringify(validation.data.goals);
   }
   if (validation.data.status !== undefined) {
-    updateData.status = validation.data.status;
-    if (validation.data.status === 'completed') {
+    updateData.status = statusMap[validation.data.status?.toLowerCase()] || validation.data.status?.toUpperCase();
+    if (validation.data.status?.toLowerCase() === 'completed') {
       updateData.completedAt = new Date();
     }
   }

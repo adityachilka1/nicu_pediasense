@@ -46,16 +46,44 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const where = { patientId: patientIdNum };
 
   if (status) {
-    const validStatuses = ['active', 'on_hold', 'completed', 'discontinued'];
-    if (validStatuses.includes(status)) {
-      where.status = status;
+    // Map lowercase to Prisma enum values
+    const statusMap = {
+      'active': 'ACTIVE',
+      'on_hold': 'ON_HOLD',
+      'completed': 'COMPLETED',
+      'discontinued': 'DISCONTINUED',
+      'archived': 'ARCHIVED',
+    };
+    const mappedStatus = statusMap[status.toLowerCase()];
+    if (mappedStatus) {
+      where.status = mappedStatus;
     }
   }
 
   if (category) {
-    const validCategories = ['respiratory', 'nutrition', 'neuro', 'infection', 'growth', 'skin', 'family', 'pain', 'developmental'];
-    if (validCategories.includes(category)) {
-      where.category = category;
+    // Map lowercase to Prisma enum values
+    const categoryMap = {
+      'respiratory': 'RESPIRATORY',
+      'nutrition': 'NUTRITION',
+      'neuro': 'NEUROLOGICAL',
+      'neurological': 'NEUROLOGICAL',
+      'infection': 'INFECTION',
+      'growth': 'GROWTH_DEVELOPMENT',
+      'growth_development': 'GROWTH_DEVELOPMENT',
+      'skin': 'SKIN_WOUND',
+      'skin_wound': 'SKIN_WOUND',
+      'family': 'FAMILY_SUPPORT',
+      'family_support': 'FAMILY_SUPPORT',
+      'pain': 'PAIN_MANAGEMENT',
+      'pain_management': 'PAIN_MANAGEMENT',
+      'developmental': 'DEVELOPMENTAL',
+      'discharge': 'DISCHARGE_PLANNING',
+      'discharge_planning': 'DISCHARGE_PLANNING',
+      'other': 'OTHER',
+    };
+    const mappedCategory = categoryMap[category.toLowerCase()];
+    if (mappedCategory) {
+      where.category = mappedCategory;
     }
   }
 
@@ -133,7 +161,7 @@ export const GET = withErrorHandler(async (request, { params }) => {
   // Get summary by category
   const categorySummary = await prisma.carePlan.groupBy({
     by: ['category'],
-    where: { patientId: patientIdNum, status: 'active' },
+    where: { patientId: patientIdNum, status: 'ACTIVE' },
     _count: true,
   });
 

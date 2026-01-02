@@ -30,16 +30,44 @@ export const GET = withErrorHandler(async (request) => {
   }
 
   if (status) {
-    const validStatuses = ['active', 'on_hold', 'completed', 'discontinued'];
-    if (validStatuses.includes(status)) {
-      where.status = status;
+    // Map lowercase to Prisma enum values
+    const statusMap = {
+      'active': 'ACTIVE',
+      'on_hold': 'ON_HOLD',
+      'completed': 'COMPLETED',
+      'discontinued': 'DISCONTINUED',
+      'archived': 'ARCHIVED',
+    };
+    const mappedStatus = statusMap[status.toLowerCase()];
+    if (mappedStatus) {
+      where.status = mappedStatus;
     }
   }
 
   if (category) {
-    const validCategories = ['respiratory', 'nutrition', 'neuro', 'infection', 'growth', 'skin', 'family', 'pain', 'developmental'];
-    if (validCategories.includes(category)) {
-      where.category = category;
+    // Map lowercase to Prisma enum values
+    const categoryMap = {
+      'respiratory': 'RESPIRATORY',
+      'nutrition': 'NUTRITION',
+      'neuro': 'NEUROLOGICAL',
+      'neurological': 'NEUROLOGICAL',
+      'infection': 'INFECTION',
+      'growth': 'GROWTH_DEVELOPMENT',
+      'growth_development': 'GROWTH_DEVELOPMENT',
+      'skin': 'SKIN_WOUND',
+      'skin_wound': 'SKIN_WOUND',
+      'family': 'FAMILY_SUPPORT',
+      'family_support': 'FAMILY_SUPPORT',
+      'pain': 'PAIN_MANAGEMENT',
+      'pain_management': 'PAIN_MANAGEMENT',
+      'developmental': 'DEVELOPMENTAL',
+      'discharge': 'DISCHARGE_PLANNING',
+      'discharge_planning': 'DISCHARGE_PLANNING',
+      'other': 'OTHER',
+    };
+    const mappedCategory = categoryMap[category.toLowerCase()];
+    if (mappedCategory) {
+      where.category = mappedCategory;
     }
   }
 
@@ -127,7 +155,7 @@ export const GET = withErrorHandler(async (request) => {
   // Get category summary
   const categorySummary = await prisma.carePlan.groupBy({
     by: ['category'],
-    where: patientId ? { patientId: parseInt(patientId), status: 'active' } : { status: 'active' },
+    where: patientId ? { patientId: parseInt(patientId), status: 'ACTIVE' } : { status: 'ACTIVE' },
     _count: true,
   });
 
@@ -191,6 +219,36 @@ export const POST = withErrorHandler(async (request) => {
     throw new NotFoundError('Patient');
   }
 
+  // Map lowercase values to Prisma enums
+  const categoryMap = {
+    'respiratory': 'RESPIRATORY',
+    'nutrition': 'NUTRITION',
+    'neuro': 'NEUROLOGICAL',
+    'neurological': 'NEUROLOGICAL',
+    'infection': 'INFECTION',
+    'growth': 'GROWTH_DEVELOPMENT',
+    'growth_development': 'GROWTH_DEVELOPMENT',
+    'skin': 'SKIN_WOUND',
+    'skin_wound': 'SKIN_WOUND',
+    'family': 'FAMILY_SUPPORT',
+    'family_support': 'FAMILY_SUPPORT',
+    'pain': 'PAIN_MANAGEMENT',
+    'pain_management': 'PAIN_MANAGEMENT',
+    'developmental': 'DEVELOPMENTAL',
+    'discharge': 'DISCHARGE_PLANNING',
+    'discharge_planning': 'DISCHARGE_PLANNING',
+    'other': 'OTHER',
+  };
+
+  const priorityMap = {
+    'high': 'HIGH',
+    'medium': 'MEDIUM',
+    'low': 'LOW',
+  };
+
+  const mappedCategory = categoryMap[category?.toLowerCase()] || 'OTHER';
+  const mappedPriority = priorityMap[priority?.toLowerCase()] || 'MEDIUM';
+
   // Create care plan with items in a transaction
   const carePlan = await prisma.$transaction(async (tx) => {
     // Create the care plan
@@ -199,25 +257,34 @@ export const POST = withErrorHandler(async (request) => {
         patientId,
         createdById: parseInt(session.user.id),
         title,
-        category,
+        category: mappedCategory,
         description,
         goals: goals ? JSON.stringify(goals) : null,
-        priority: priority || 'medium',
-        status: 'active',
+        priority: mappedPriority,
+        status: 'ACTIVE',
         targetDate: targetDate ? new Date(targetDate) : null,
       },
     });
 
     // Create items if provided
     if (items && items.length > 0) {
+      const itemTypeMap = {
+        'task': 'TASK',
+        'assessment': 'ASSESSMENT',
+        'intervention': 'INTERVENTION',
+        'education': 'EDUCATION',
+        'monitoring': 'MONITORING',
+        'consultation': 'CONSULTATION',
+      };
+
       await tx.carePlanItem.createMany({
         data: items.map((item, index) => ({
           carePlanId: plan.id,
           description: item.description,
-          itemType: item.itemType || 'task',
+          itemType: itemTypeMap[item.itemType?.toLowerCase()] || 'TASK',
           frequency: item.frequency,
           dueDate: item.dueDate ? new Date(item.dueDate) : null,
-          status: 'pending',
+          status: 'PENDING',
         })),
       });
     }
@@ -317,13 +384,23 @@ export const PUT = withErrorHandler(async (request) => {
       throw new NotFoundError('Care plan item');
     }
 
+    // Map status to Prisma enum
+    const itemStatusMap = {
+      'pending': 'PENDING',
+      'in_progress': 'IN_PROGRESS',
+      'completed': 'COMPLETED',
+      'skipped': 'SKIPPED',
+      'deferred': 'DEFERRED',
+    };
+    const mappedItemStatus = itemStatusMap[validation.data.status?.toLowerCase()] || validation.data.status?.toUpperCase();
+
     // Update the item
     const updateData = {
-      status: validation.data.status,
+      status: mappedItemStatus,
       notes: validation.data.notes,
     };
 
-    if (validation.data.status === 'completed') {
+    if (validation.data.status?.toLowerCase() === 'completed') {
       updateData.completedAt = new Date();
       updateData.completedById = parseInt(session.user.id);
     }
@@ -342,7 +419,7 @@ export const PUT = withErrorHandler(async (request) => {
       prisma.carePlanItem.count({
         where: {
           carePlanId: existingItem.carePlanId,
-          status: { notIn: ['completed', 'skipped'] },
+          status: { notIn: ['COMPLETED', 'SKIPPED'] },
         },
       }),
     ]);
@@ -354,7 +431,7 @@ export const PUT = withErrorHandler(async (request) => {
       await prisma.carePlan.update({
         where: { id: existingItem.carePlanId },
         data: {
-          status: 'completed',
+          status: 'COMPLETED',
           completedAt: new Date(),
         },
       });
@@ -411,12 +488,28 @@ export const PUT = withErrorHandler(async (request) => {
     throw new NotFoundError('Care plan');
   }
 
+  // Maps for enum values
+  const planPriorityMap = {
+    'high': 'HIGH',
+    'medium': 'MEDIUM',
+    'low': 'LOW',
+  };
+  const planStatusMap = {
+    'active': 'ACTIVE',
+    'on_hold': 'ON_HOLD',
+    'completed': 'COMPLETED',
+    'discontinued': 'DISCONTINUED',
+    'archived': 'ARCHIVED',
+  };
+
   // Prepare update data
   const updateData = {};
 
   if (validation.data.title !== undefined) updateData.title = validation.data.title;
   if (validation.data.description !== undefined) updateData.description = validation.data.description;
-  if (validation.data.priority !== undefined) updateData.priority = validation.data.priority;
+  if (validation.data.priority !== undefined) {
+    updateData.priority = planPriorityMap[validation.data.priority?.toLowerCase()] || validation.data.priority?.toUpperCase();
+  }
   if (validation.data.targetDate !== undefined) {
     updateData.targetDate = validation.data.targetDate ? new Date(validation.data.targetDate) : null;
   }
@@ -424,8 +517,8 @@ export const PUT = withErrorHandler(async (request) => {
     updateData.goals = JSON.stringify(validation.data.goals);
   }
   if (validation.data.status !== undefined) {
-    updateData.status = validation.data.status;
-    if (validation.data.status === 'completed') {
+    updateData.status = planStatusMap[validation.data.status?.toLowerCase()] || validation.data.status?.toUpperCase();
+    if (validation.data.status?.toLowerCase() === 'completed') {
       updateData.completedAt = new Date();
     }
   }
