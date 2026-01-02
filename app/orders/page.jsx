@@ -1,42 +1,137 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../../components/AppShell';
+import { useToast } from '@/components/Toast';
 
-const orderSets = [
-  { id: 'admission', name: 'NICU Admission', items: 12 },
-  { id: 'sepsis', name: 'Sepsis Workup', items: 8 },
-  { id: 'rds', name: 'RDS Management', items: 6 },
-  { id: 'hyperbili', name: 'Hyperbilirubinemia', items: 5 },
-  { id: 'hypoglycemia', name: 'Hypoglycemia Protocol', items: 4 },
-];
+// Status enum for orders
+const ORDER_STATUS = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  DISCONTINUED: 'discontinued',
+  CANCELLED: 'cancelled',
+};
 
-const recentOrders = [
-  { id: 1, type: 'Lab', order: 'CBC with Diff', patient: 'Baby Martinez', status: 'Pending', priority: 'Routine', orderedBy: 'Dr. Chen', time: '10:30' },
-  { id: 2, type: 'Lab', order: 'Blood Culture', patient: 'Baby Martinez', status: 'Collected', priority: 'STAT', orderedBy: 'Dr. Chen', time: '10:30' },
-  { id: 3, type: 'Med', order: 'Ampicillin 50mg/kg IV', patient: 'Baby Martinez', status: 'Administered', priority: 'STAT', orderedBy: 'Dr. Chen', time: '10:35' },
-  { id: 4, type: 'Med', order: 'Gentamicin 4mg/kg IV', patient: 'Baby Martinez', status: 'Scheduled', priority: 'Routine', orderedBy: 'Dr. Chen', time: '10:35' },
-  { id: 5, type: 'Imaging', order: 'Chest X-Ray', patient: 'Baby Thompson', status: 'Completed', priority: 'Routine', orderedBy: 'Dr. Patel', time: '09:15' },
-  { id: 6, type: 'Lab', order: 'Bilirubin (Total/Direct)', patient: 'Baby Williams', status: 'Pending', priority: 'Routine', orderedBy: 'Dr. Chen', time: '08:00' },
-];
+// Priority enum
+const ORDER_PRIORITY = {
+  STAT: 'stat',
+  URGENT: 'urgent',
+  ROUTINE: 'routine',
+  SCHEDULED: 'scheduled',
+};
 
-const orderCategories = [
-  { id: 'labs', name: 'Laboratory', icon: '🧪', items: ['CBC', 'BMP', 'Blood Culture', 'Bilirubin', 'Blood Gas', 'Glucose', 'CRP', 'Procalcitonin'] },
-  { id: 'meds', name: 'Medications', icon: '💊', items: ['Ampicillin', 'Gentamicin', 'Caffeine', 'Surfactant', 'Vancomycin', 'Dopamine', 'Fentanyl'] },
-  { id: 'imaging', name: 'Imaging', icon: '📷', items: ['Chest X-Ray', 'Abdominal X-Ray', 'Head Ultrasound', 'Echocardiogram', 'Renal Ultrasound'] },
-  { id: 'nursing', name: 'Nursing', icon: '👩‍⚕️', items: ['Vital Signs Q1H', 'Strict I/O', 'Daily Weights', 'Phototherapy', 'Isolette Humidity'] },
-  { id: 'consults', name: 'Consults', icon: '📋', items: ['Cardiology', 'Surgery', 'Ophthalmology', 'Neurology', 'Genetics'] },
-  { id: 'respiratory', name: 'Respiratory', icon: '🫁', items: ['Intubation', 'CPAP', 'High Flow NC', 'Surfactant Admin', 'Extubation'] },
-];
+// Order categories
+const ORDER_CATEGORIES = {
+  labs: { id: 'lab', name: 'Laboratory', icon: '🧪', items: ['CBC', 'BMP', 'Blood Culture', 'Bilirubin', 'Blood Gas', 'Glucose', 'CRP', 'Procalcitonin'] },
+  meds: { id: 'medication', name: 'Medications', icon: '💊', items: ['Ampicillin', 'Gentamicin', 'Caffeine', 'Surfactant', 'Vancomycin', 'Dopamine', 'Fentanyl'] },
+  imaging: { id: 'imaging', name: 'Imaging', icon: '📷', items: ['Chest X-Ray', 'Abdominal X-Ray', 'Head Ultrasound', 'Echocardiogram', 'Renal Ultrasound'] },
+  nursing: { id: 'nursing', name: 'Nursing', icon: '👩‍⚕️', items: ['Vital Signs Q1H', 'Strict I/O', 'Daily Weights', 'Phototherapy', 'Isolette Humidity'] },
+  consults: { id: 'procedure', name: 'Consults', icon: '📋', items: ['Cardiology', 'Surgery', 'Ophthalmology', 'Neurology', 'Genetics'] },
+  respiratory: { id: 'respiratory', name: 'Respiratory', icon: '🫁', items: ['Intubation', 'CPAP', 'High Flow NC', 'Surfactant Admin', 'Extubation'] },
+};
 
 export default function OrdersPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('active');
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedPatient, setSelectedPatient] = useState('Baby Martinez');
-  const [orders, setOrders] = useState(recentOrders);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [orderSets, setOrderSets] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
-  const [orderPriority, setOrderPriority] = useState('Routine');
+  const [orderPriority, setOrderPriority] = useState(ORDER_PRIORITY.ROUTINE);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null);
+
+  // Fetch patients
+  const fetchPatients = useCallback(async () => {
+    try {
+      const response = await fetch('/api/patients');
+      if (!response.ok) throw new Error('Failed to fetch patients');
+      const result = await response.json();
+      setPatients(result.data || []);
+      if (result.data?.length > 0 && !selectedPatient) {
+        setSelectedPatient(result.data[0]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch patients:', err);
+    }
+  }, [selectedPatient]);
+
+  // Fetch orders
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (selectedPatient?.id) {
+        params.append('patientId', selectedPatient.id);
+      }
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
+      params.append('includeOrderSets', 'true');
+
+      const response = await fetch(`/api/orders?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch orders');
+
+      const result = await response.json();
+      setOrders(result.data || []);
+      if (result.meta?.orderSets) {
+        setOrderSets(result.meta.orderSets);
+      }
+    } catch (err) {
+      setError(err.message);
+      toast.error('Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedPatient, statusFilter, toast]);
+
+  // Fetch order sets
+  const fetchOrderSets = useCallback(async () => {
+    try {
+      const response = await fetch('/api/orders/sets');
+      if (!response.ok) throw new Error('Failed to fetch order sets');
+      const result = await response.json();
+      setOrderSets(result.data || []);
+    } catch (err) {
+      console.error('Failed to fetch order sets:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPatients();
+    fetchOrderSets();
+  }, [fetchPatients, fetchOrderSets]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // Update tab-based status filter
+  useEffect(() => {
+    switch (activeTab) {
+      case 'active':
+        setStatusFilter('active');
+        break;
+      case 'pending':
+        setStatusFilter('pending');
+        break;
+      case 'completed':
+        setStatusFilter('completed');
+        break;
+      case 'discontinued':
+        setStatusFilter('discontinued');
+        break;
+      default:
+        setStatusFilter(null);
+    }
+  }, [activeTab]);
 
   const handleToggleItem = (item) => {
     if (selectedItems.includes(item)) {
@@ -46,46 +141,160 @@ export default function OrdersPage() {
     }
   };
 
-  const handlePlaceOrder = () => {
-    if (selectedItems.length > 0) {
-      const category = orderCategories.find(c => c.id === selectedCategory);
-      const typeMap = { labs: 'Lab', meds: 'Med', imaging: 'Imaging', nursing: 'Nursing', consults: 'Consult', respiratory: 'Resp' };
-      const newOrders = selectedItems.map((item, index) => ({
-        id: orders.length + index + 1,
-        type: typeMap[selectedCategory] || 'Other',
-        order: item,
-        patient: selectedPatient,
-        status: 'Pending',
-        priority: orderPriority,
-        orderedBy: 'Dr. Chen',
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-      }));
-      setOrders([...newOrders, ...orders]);
+  const handlePlaceOrder = async () => {
+    if (selectedItems.length === 0 || !selectedPatient) return;
+
+    setSubmitting(true);
+    try {
+      const category = ORDER_CATEGORIES[selectedCategory];
+
+      // Create orders for each selected item
+      const orderPromises = selectedItems.map(async (item) => {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: selectedPatient.id,
+            category: category.id,
+            orderType: 'one_time',
+            priority: orderPriority,
+            name: item,
+            details: { itemName: item },
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to create order');
+        }
+
+        return response.json();
+      });
+
+      await Promise.all(orderPromises);
+
+      toast.success(`${selectedItems.length} order(s) placed successfully`);
       setSelectedItems([]);
       setSelectedCategory(null);
-      setOrderPriority('Routine');
+      setOrderPriority(ORDER_PRIORITY.ROUTINE);
       setShowNewOrder(false);
+      fetchOrders();
+    } catch (err) {
+      toast.error(err.message || 'Failed to place orders');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId, newStatus, reason = null) => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: newStatus,
+          discontinueReason: reason,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Failed to update order');
+      }
+
+      toast.success(`Order ${newStatus}`);
+      fetchOrders();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleApplyOrderSet = async (orderSet) => {
+    if (!selectedPatient) {
+      toast.warning('Please select a patient first');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const items = orderSet.items || [];
+      const orderPromises = items.map(async (item) => {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: selectedPatient.id,
+            category: item.category || 'lab',
+            orderType: item.orderType || 'one_time',
+            priority: item.priority || 'routine',
+            name: item.name,
+            details: item,
+            orderSetId: orderSet.id,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error?.message || 'Failed to create order');
+        }
+
+        return response.json();
+      });
+
+      await Promise.all(orderPromises);
+      toast.success(`Applied order set: ${orderSet.name}`);
+      fetchOrders();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Pending': return 'bg-yellow-500/20 text-yellow-400';
-      case 'Collected': return 'bg-blue-500/20 text-blue-400';
-      case 'Administered': return 'bg-green-500/20 text-green-400';
-      case 'Scheduled': return 'bg-purple-500/20 text-purple-400';
-      case 'Completed': return 'bg-green-500/20 text-green-400';
+      case ORDER_STATUS.PENDING: return 'bg-yellow-500/20 text-yellow-400';
+      case ORDER_STATUS.ACTIVE: return 'bg-blue-500/20 text-blue-400';
+      case ORDER_STATUS.COMPLETED: return 'bg-green-500/20 text-green-400';
+      case ORDER_STATUS.DISCONTINUED: return 'bg-red-500/20 text-red-400';
+      case ORDER_STATUS.CANCELLED: return 'bg-slate-500/20 text-slate-400';
       default: return 'bg-slate-500/20 text-slate-400';
     }
   };
 
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'Lab': return 'text-cyan-400';
-      case 'Med': return 'text-green-400';
-      case 'Imaging': return 'text-purple-400';
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case ORDER_PRIORITY.STAT: return 'bg-red-500/20 text-red-400';
+      case ORDER_PRIORITY.URGENT: return 'bg-orange-500/20 text-orange-400';
+      case ORDER_PRIORITY.ROUTINE: return 'bg-slate-500/20 text-slate-400';
+      case ORDER_PRIORITY.SCHEDULED: return 'bg-purple-500/20 text-purple-400';
+      default: return 'bg-slate-500/20 text-slate-400';
+    }
+  };
+
+  const getCategoryColor = (category) => {
+    switch (category) {
+      case 'lab': return 'text-cyan-400';
+      case 'medication': return 'text-green-400';
+      case 'imaging': return 'text-purple-400';
+      case 'nursing': return 'text-pink-400';
+      case 'respiratory': return 'text-blue-400';
+      case 'procedure': return 'text-orange-400';
       default: return 'text-slate-400';
     }
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  const orderCounts = {
+    active: orders.filter(o => o.status === ORDER_STATUS.ACTIVE).length,
+    pending: orders.filter(o => o.status === ORDER_STATUS.PENDING).length,
+    completed: orders.filter(o => o.status === ORDER_STATUS.COMPLETED).length,
+    discontinued: orders.filter(o => o.status === ORDER_STATUS.DISCONTINUED || o.status === ORDER_STATUS.CANCELLED).length,
   };
 
   return (
@@ -98,15 +307,24 @@ export default function OrdersPage() {
             <p className="text-slate-400 text-sm">Order entry and management</p>
           </div>
           <div className="flex items-center gap-3">
-            <select className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white">
-              <option>All Patients</option>
-              <option>Baby Martinez</option>
-              <option>Baby Thompson</option>
-              <option>Baby Williams</option>
+            <select
+              value={selectedPatient?.id || ''}
+              onChange={(e) => {
+                const patient = patients.find(p => p.id === parseInt(e.target.value));
+                setSelectedPatient(patient);
+              }}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white min-w-[200px]"
+            >
+              <option value="">All Patients</option>
+              {patients.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.name}
+                </option>
+              ))}
             </select>
             <button
               onClick={() => setShowNewOrder(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -123,12 +341,17 @@ export default function OrdersPage() {
             {orderSets.map((set) => (
               <button
                 key={set.id}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm transition-colors"
+                onClick={() => handleApplyOrderSet(set)}
+                disabled={submitting || !selectedPatient}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {set.name}
-                <span className="ml-2 text-xs text-slate-400">({set.items})</span>
+                <span className="ml-2 text-xs text-slate-400">({set.itemCount || set.items?.length || 0})</span>
               </button>
             ))}
+            {orderSets.length === 0 && (
+              <span className="text-slate-500 text-sm">No order sets available</span>
+            )}
           </div>
         </div>
 
@@ -145,71 +368,137 @@ export default function OrdersPage() {
               }`}
             >
               {tab}
-              {tab === 'active' && <span className="ml-2 px-1.5 py-0.5 bg-cyan-500/30 rounded text-xs">6</span>}
-              {tab === 'pending' && <span className="ml-2 px-1.5 py-0.5 bg-yellow-500/30 rounded text-xs">2</span>}
+              {orderCounts[tab] > 0 && (
+                <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
+                  tab === 'pending' ? 'bg-yellow-500/30' : 'bg-cyan-500/30'
+                }`}>
+                  {orderCounts[tab]}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {/* Orders Table */}
-        <div className="bg-slate-800 rounded-xl border border-slate-700">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-xs text-slate-400 border-b border-slate-700">
-                  <th className="p-4">Type</th>
-                  <th className="p-4">Order</th>
-                  <th className="p-4">Patient</th>
-                  <th className="p-4">Priority</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Ordered By</th>
-                  <th className="p-4">Time</th>
-                  <th className="p-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                    <td className="p-4">
-                      <span className={`text-sm font-medium ${getTypeColor(order.type)}`}>{order.type}</span>
-                    </td>
-                    <td className="p-4 text-white font-medium">{order.order}</td>
-                    <td className="p-4 text-slate-300">{order.patient}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        order.priority === 'STAT' ? 'bg-red-500/20 text-red-400' : 'bg-slate-500/20 text-slate-400'
-                      }`}>
-                        {order.priority}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded text-xs ${getStatusColor(order.status)}`}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-400 text-sm">{order.orderedBy}</td>
-                    <td className="p-4 text-slate-400 text-sm">{order.time}</td>
-                    <td className="p-4">
-                      <div className="flex gap-2">
-                        <button className="p-1 hover:bg-slate-600 rounded text-slate-400 hover:text-white">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </button>
-                        <button className="p-1 hover:bg-slate-600 rounded text-slate-400 hover:text-white">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 text-red-400">
+            {error}
+            <button onClick={fetchOrders} className="ml-4 underline">Retry</button>
           </div>
-        </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-slate-800 rounded-xl p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-slate-400">Loading orders...</p>
+          </div>
+        )}
+
+        {/* Orders Table */}
+        {!loading && (
+          <div className="bg-slate-800 rounded-xl border border-slate-700">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-xs text-slate-400 border-b border-slate-700">
+                    <th className="p-4">Type</th>
+                    <th className="p-4">Order</th>
+                    <th className="p-4">Patient</th>
+                    <th className="p-4">Priority</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Ordered By</th>
+                    <th className="p-4">Time</th>
+                    <th className="p-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="p-8 text-center text-slate-500">
+                        No orders found
+                      </td>
+                    </tr>
+                  ) : (
+                    orders.map((order) => (
+                      <tr key={order.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                        <td className="p-4">
+                          <span className={`text-sm font-medium capitalize ${getCategoryColor(order.category)}`}>
+                            {order.category}
+                          </span>
+                        </td>
+                        <td className="p-4 text-white font-medium">{order.name}</td>
+                        <td className="p-4 text-slate-300">{order.patient?.name || '-'}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded text-xs uppercase ${getPriorityColor(order.priority)}`}>
+                            {order.priority}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded text-xs capitalize ${getStatusColor(order.status)}`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-400 text-sm">
+                          {order.ordering?.fullName || order.ordering?.initials || '-'}
+                        </td>
+                        <td className="p-4 text-slate-400 text-sm">{formatTime(order.createdAt)}</td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            {order.status === ORDER_STATUS.PENDING && (
+                              <button
+                                onClick={() => handleUpdateOrderStatus(order.id, ORDER_STATUS.ACTIVE)}
+                                className="p-1 hover:bg-green-600/20 rounded text-green-400 hover:text-green-300"
+                                title="Activate"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </button>
+                            )}
+                            {order.status === ORDER_STATUS.ACTIVE && (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateOrderStatus(order.id, ORDER_STATUS.COMPLETED)}
+                                  className="p-1 hover:bg-green-600/20 rounded text-green-400 hover:text-green-300"
+                                  title="Complete"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateOrderStatus(order.id, ORDER_STATUS.DISCONTINUED, 'Clinical decision')}
+                                  className="p-1 hover:bg-red-600/20 rounded text-red-400 hover:text-red-300"
+                                  title="Discontinue"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                            {order.status === ORDER_STATUS.PENDING && (
+                              <button
+                                onClick={() => handleUpdateOrderStatus(order.id, ORDER_STATUS.CANCELLED)}
+                                className="p-1 hover:bg-slate-600 rounded text-slate-400 hover:text-white"
+                                title="Cancel"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* New Order Modal */}
         {showNewOrder && (
@@ -217,7 +506,14 @@ export default function OrdersPage() {
             <div className="bg-slate-800 rounded-xl p-6 w-full max-w-4xl border border-slate-700 max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-white">New Order</h3>
-                <button onClick={() => setShowNewOrder(false)} className="text-slate-400 hover:text-white">
+                <button
+                  onClick={() => {
+                    setShowNewOrder(false);
+                    setSelectedItems([]);
+                    setSelectedCategory(null);
+                  }}
+                  className="text-slate-400 hover:text-white"
+                >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -226,26 +522,32 @@ export default function OrdersPage() {
 
               {/* Patient Selection */}
               <div className="mb-6">
-                <label className="block text-sm text-slate-400 mb-2">Patient</label>
+                <label className="block text-sm text-slate-400 mb-2">Patient *</label>
                 <select
-                  value={selectedPatient}
-                  onChange={(e) => setSelectedPatient(e.target.value)}
+                  value={selectedPatient?.id || ''}
+                  onChange={(e) => {
+                    const patient = patients.find(p => p.id === parseInt(e.target.value));
+                    setSelectedPatient(patient);
+                  }}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
                 >
-                  <option>Baby Martinez</option>
-                  <option>Baby Thompson</option>
-                  <option>Baby Williams</option>
+                  <option value="">Select a patient</option>
+                  {patients.map((patient) => (
+                    <option key={patient.id} value={patient.id}>
+                      {patient.name} (MRN: {patient.mrn})
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* Order Categories */}
               <div className="grid grid-cols-6 gap-3 mb-6">
-                {orderCategories.map((cat) => (
+                {Object.entries(ORDER_CATEGORIES).map(([key, cat]) => (
                   <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
+                    key={key}
+                    onClick={() => setSelectedCategory(key === selectedCategory ? null : key)}
                     className={`p-4 rounded-lg text-center transition-colors ${
-                      selectedCategory === cat.id
+                      selectedCategory === key
                         ? 'bg-cyan-500/20 border border-cyan-500/50'
                         : 'bg-slate-700 hover:bg-slate-600 border border-transparent'
                     }`}
@@ -260,13 +562,13 @@ export default function OrdersPage() {
               {selectedCategory && (
                 <div className="bg-slate-700/50 rounded-lg p-4">
                   <h4 className="text-sm font-medium text-slate-400 mb-3">
-                    {orderCategories.find(c => c.id === selectedCategory)?.name} Orders
+                    {ORDER_CATEGORIES[selectedCategory]?.name} Orders
                     {selectedItems.length > 0 && (
                       <span className="ml-2 text-cyan-400">({selectedItems.length} selected)</span>
                     )}
                   </h4>
                   <div className="grid grid-cols-3 gap-2">
-                    {orderCategories.find(c => c.id === selectedCategory)?.items.map((item) => (
+                    {ORDER_CATEGORIES[selectedCategory]?.items.map((item) => (
                       <button
                         key={item}
                         onClick={() => handleToggleItem(item)}
@@ -299,26 +601,20 @@ export default function OrdersPage() {
                 <div className="mt-4">
                   <label className="block text-sm text-slate-400 mb-2">Priority</label>
                   <div className="flex gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="priority"
-                        checked={orderPriority === 'Routine'}
-                        onChange={() => setOrderPriority('Routine')}
-                        className="text-cyan-500"
-                      />
-                      <span className="text-white">Routine</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="priority"
-                        checked={orderPriority === 'STAT'}
-                        onChange={() => setOrderPriority('STAT')}
-                        className="text-cyan-500"
-                      />
-                      <span className="text-red-400 font-medium">STAT</span>
-                    </label>
+                    {Object.entries(ORDER_PRIORITY).map(([key, value]) => (
+                      <label key={key} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="priority"
+                          checked={orderPriority === value}
+                          onChange={() => setOrderPriority(value)}
+                          className="text-cyan-500"
+                        />
+                        <span className={`${value === 'stat' ? 'text-red-400 font-medium' : 'text-white'} capitalize`}>
+                          {value}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               )}
@@ -330,19 +626,22 @@ export default function OrdersPage() {
                     setSelectedItems([]);
                     setSelectedCategory(null);
                   }}
-                  className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600"
+                  className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handlePlaceOrder}
-                  disabled={selectedItems.length === 0}
-                  className={`flex-1 py-2 rounded-lg ${
-                    selectedItems.length > 0
+                  disabled={selectedItems.length === 0 || !selectedPatient || submitting}
+                  className={`flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                    selectedItems.length > 0 && selectedPatient && !submitting
                       ? 'bg-cyan-500 text-white hover:bg-cyan-600'
                       : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                   }`}
                 >
+                  {submitting && (
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  )}
                   Place Order {selectedItems.length > 0 && `(${selectedItems.length})`}
                 </button>
               </div>

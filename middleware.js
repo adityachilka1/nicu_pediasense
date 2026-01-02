@@ -148,12 +148,13 @@ function applySecurityHeaders(response, isSecure, nonce) {
 }
 
 // Role-based route permissions (inlined for edge runtime compatibility)
+// NOTE: These values must match database role values (snake_case)
 const ROLES = {
-  ADMIN: 'Admin',
-  PHYSICIAN: 'Physician',
-  CHARGE_NURSE: 'Charge Nurse',
-  STAFF_NURSE: 'Staff Nurse',
-  ADMINISTRATIVE: 'Administrative',
+  ADMIN: 'admin',
+  PHYSICIAN: 'physician',
+  CHARGE_NURSE: 'charge_nurse',
+  STAFF_NURSE: 'staff_nurse',
+  ADMINISTRATIVE: 'administrative',
 };
 
 const routePermissions = {

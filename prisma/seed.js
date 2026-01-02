@@ -323,6 +323,94 @@ async function main() {
     });
   }
 
+  // Clear and create order sets
+  await prisma.orderSet.deleteMany();
+
+  const orderSets = [
+    {
+      name: 'NICU Admission',
+      description: 'Standard admission orders for NICU patients',
+      category: 'admission',
+      items: JSON.stringify([
+        { name: 'CBC with Differential', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Blood Culture', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'BMP', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Blood Gas', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Blood Glucose', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Type and Screen', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Chest X-Ray', category: 'imaging', orderType: 'one_time', priority: 'routine' },
+        { name: 'Vital Signs Q1H', category: 'nursing', orderType: 'continuous', priority: 'routine' },
+        { name: 'Strict I/O', category: 'nursing', orderType: 'continuous', priority: 'routine' },
+        { name: 'Daily Weights', category: 'nursing', orderType: 'recurring', priority: 'routine' },
+        { name: 'IV Fluids D10W', category: 'medication', orderType: 'continuous', priority: 'routine' },
+        { name: 'Vitamin K 1mg IM', category: 'medication', orderType: 'one_time', priority: 'routine' },
+      ]),
+      active: true,
+    },
+    {
+      name: 'Sepsis Workup',
+      description: 'Complete sepsis evaluation and empiric treatment',
+      category: 'infection',
+      items: JSON.stringify([
+        { name: 'Blood Culture x2', category: 'lab', orderType: 'one_time', priority: 'stat' },
+        { name: 'CBC with Differential', category: 'lab', orderType: 'one_time', priority: 'stat' },
+        { name: 'CRP', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Procalcitonin', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Urinalysis + Culture', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Ampicillin 50mg/kg IV Q12H', category: 'medication', orderType: 'recurring', priority: 'stat' },
+        { name: 'Gentamicin 4mg/kg IV Q24H', category: 'medication', orderType: 'recurring', priority: 'stat' },
+        { name: 'Vital Signs Q2H', category: 'nursing', orderType: 'continuous', priority: 'routine' },
+      ]),
+      active: true,
+    },
+    {
+      name: 'RDS Management',
+      description: 'Respiratory Distress Syndrome protocol',
+      category: 'respiratory',
+      items: JSON.stringify([
+        { name: 'Chest X-Ray', category: 'imaging', orderType: 'one_time', priority: 'stat' },
+        { name: 'Blood Gas Q6H', category: 'lab', orderType: 'recurring', priority: 'routine' },
+        { name: 'Surfactant if indicated', category: 'medication', orderType: 'one_time', priority: 'stat' },
+        { name: 'Caffeine Citrate 20mg/kg load', category: 'medication', orderType: 'one_time', priority: 'routine' },
+        { name: 'Caffeine Citrate 5mg/kg daily', category: 'medication', orderType: 'recurring', priority: 'routine' },
+        { name: 'Continuous SpO2 monitoring', category: 'nursing', orderType: 'continuous', priority: 'routine' },
+      ]),
+      active: true,
+    },
+    {
+      name: 'Hyperbilirubinemia',
+      description: 'Jaundice workup and phototherapy',
+      category: 'hyperbilirubinemia',
+      items: JSON.stringify([
+        { name: 'Total/Direct Bilirubin', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Blood Type + Coombs', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Reticulocyte Count', category: 'lab', orderType: 'one_time', priority: 'routine' },
+        { name: 'Phototherapy', category: 'nursing', orderType: 'continuous', priority: 'routine' },
+        { name: 'Repeat Bilirubin Q12H', category: 'lab', orderType: 'recurring', priority: 'routine' },
+      ]),
+      active: true,
+    },
+    {
+      name: 'Hypoglycemia Protocol',
+      description: 'Blood glucose monitoring and management',
+      category: 'hypoglycemia',
+      items: JSON.stringify([
+        { name: 'Blood Glucose Q3H', category: 'lab', orderType: 'recurring', priority: 'routine' },
+        { name: 'D10W IV if glucose <40', category: 'medication', orderType: 'prn', priority: 'stat' },
+        { name: 'Increase feeding frequency', category: 'nursing', orderType: 'continuous', priority: 'routine' },
+        { name: 'Calculate GIR', category: 'nursing', orderType: 'one_time', priority: 'routine' },
+      ]),
+      active: true,
+    },
+  ];
+
+  for (const orderSet of orderSets) {
+    await prisma.orderSet.create({
+      data: orderSet,
+    });
+    console.log(`Created order set: ${orderSet.name}`);
+  }
+
   console.log('Database seeding completed!');
 }
 

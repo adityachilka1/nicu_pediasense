@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { hasPermission, getRoleColor } from '@/lib/permissions';
+import { hasPermission, getRoleColor, getRoleDisplayName } from '@/lib/permissions';
 
 const navItems = [
   {
@@ -350,7 +350,7 @@ export default function Navigation({ alarmCount = 0 }) {
               </div>
               {userRole && (
                 <div className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded border mt-0.5 ${getRoleColor(userRole)}`}>
-                  {userRole}
+                  {getRoleDisplayName(userRole)}
                 </div>
               )}
             </div>

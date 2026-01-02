@@ -5,14 +5,13 @@ module.exports = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'monospace'],
-      },
       colors: {
-        // NestWatch Brand Colors
+        // ==========================================
+        // BRAND COLORS
+        // ==========================================
         brand: {
           50: '#ECFEFF',
           100: '#CFFAFE',
@@ -27,75 +26,115 @@ module.exports = {
           950: '#083344',
         },
 
-        // Status Colors (Medical)
-        critical: {
-          light: '#FEF2F2',
-          DEFAULT: '#DC2626',
-          dark: '#450A0A',
-        },
-        warning: {
-          light: '#FFFBEB',
-          DEFAULT: '#F59E0B',
-          dark: '#451A03',
-        },
-        stable: {
-          light: '#ECFDF5',
-          DEFAULT: '#10B981',
-          dark: '#022C22',
-        },
-        info: {
-          light: '#EFF6FF',
-          DEFAULT: '#3B82F6',
-          dark: '#172554',
+        // ==========================================
+        // DASHBOARD BACKGROUNDS (Dark Mode Default)
+        // ==========================================
+        dashboard: {
+          bg: '#0F172A',        // Main background
+          surface: '#1E293B',   // Cards, panels
+          elevated: '#334155',  // Modals, dropdowns
+          sunken: '#020617',    // Inset areas
         },
 
-        // Vitals (IEC 60601-1-8 Color Coding)
-        vitals: {
-          spo2: '#00FFFF',    // Cyan - SpO2
-          hr: '#00FF00',      // Green - Heart Rate
-          rr: '#FFFF00',      // Yellow - Respiratory Rate
-          temp: '#FF99FF',    // Pink/Magenta - Temperature
-          fio2: '#FFFFFF',    // White - FiO2
-          bp: '#FF0000',      // Red - Blood Pressure
+        // ==========================================
+        // TEXT COLORS
+        // ==========================================
+        content: {
+          primary: '#F8FAFC',
+          secondary: '#CBD5E1',
+          tertiary: '#94A3B8',
+          disabled: '#475569',
+          inverse: '#0F172A',
+          brand: '#22D3EE',
         },
 
-        // Alarm Priorities (IEC 60601-1-8)
-        alarm: {
-          critical: '#FF0000',  // Red - High Priority
-          warning: '#FFFF00',   // Yellow - Medium Priority
-          advisory: '#00FFFF',  // Cyan - Low Priority
+        // ==========================================
+        // BORDER COLORS
+        // ==========================================
+        edge: {
+          default: '#334155',
+          strong: '#475569',
+          focus: '#22D3EE',
         },
 
-        // Legacy clinical colors (backward compatibility)
+        // ==========================================
+        // PATIENT STATUS
+        // ==========================================
+        status: {
+          critical: {
+            DEFAULT: '#EF4444',
+            bg: '#450A0A',
+            border: '#DC2626',
+          },
+          warning: {
+            DEFAULT: '#FBBF24',
+            bg: '#451A03',
+            border: '#F59E0B',
+          },
+          stable: {
+            DEFAULT: '#34D399',
+            bg: '#022C22',
+            border: '#10B981',
+          },
+          info: {
+            DEFAULT: '#60A5FA',
+            bg: '#172554',
+            border: '#3B82F6',
+          },
+        },
+
+        // ==========================================
+        // VITALS (IEC 60601-1-8 Medical Standard)
+        // ==========================================
         vital: {
-          critical: '#ef4444',
-          warning: '#f59e0b',
-          normal: '#22d3ee',
-          stable: '#10b981',
+          spo2: '#00FFFF',
+          hr: '#00FF00',
+          rr: '#FFFF00',
+          temp: '#FF99FF',
+          fio2: '#FFFFFF',
+          bp: '#FF0000',
+        },
+
+        // ==========================================
+        // ALARMS (IEC 60601-1-8 Medical Standard)
+        // ==========================================
+        alarm: {
+          critical: '#FF0000',
+          warning: '#FFFF00',
+          advisory: '#00FFFF',
         },
       },
 
-      // Background Colors
-      backgroundColor: {
-        // Light mode surfaces
-        'light-surface': '#F8FAFC',
-        'light-elevated': '#F1F5F9',
-        'light-sunken': '#E2E8F0',
-        // Dark mode surfaces
-        'dark-surface': '#1E293B',
-        'dark-elevated': '#334155',
-        'dark-sunken': '#020617',
+      // ==========================================
+      // SHADOWS
+      // ==========================================
+      boxShadow: {
+        'glow-critical': '0 0 20px 0 rgba(239, 68, 68, 0.4)',
+        'glow-warning': '0 0 20px 0 rgba(251, 191, 36, 0.4)',
+        'glow-stable': '0 0 20px 0 rgba(52, 211, 153, 0.3)',
+        'glow-brand': '0 0 20px 0 rgba(34, 211, 238, 0.3)',
+        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
+        'card-hover': '0 10px 20px -5px rgba(0, 0, 0, 0.4)',
       },
 
+      // ==========================================
+      // ANIMATIONS (for alarms/pulse)
+      // ==========================================
       animation: {
-        'pulse-slow': 'pulse-slow 2s ease-in-out infinite',
+        'pulse-critical': 'pulse-critical 1s ease-in-out infinite',
+        'pulse-slow': 'pulse 3s ease-in-out infinite',
+        'blink': 'blink 1s step-end infinite',
         'glow': 'glow 2s ease-in-out infinite',
         'glow-critical': 'glow-critical 1s ease-in-out infinite',
       },
       keyframes: {
-        'pulse-slow': {
+        'pulse-critical': {
           '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.85' },
+          '50%': { opacity: '0.5' },
+        },
+        'blink': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0' },
         },
         'glow': {
           '0%, 100%': { boxShadow: '0 0 5px rgba(239, 68, 68, 0.3)' },
@@ -106,7 +145,23 @@ module.exports = {
           '50%': { boxShadow: '0 0 25px rgba(255, 0, 0, 0.8)' },
         },
       },
+
+      // ==========================================
+      // TYPOGRAPHY
+      // ==========================================
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SF Mono', 'Consolas', 'monospace'],
+      },
+
+      // ==========================================
+      // BORDER RADIUS
+      // ==========================================
+      borderRadius: {
+        'card': '12px',
+        'panel': '16px',
+      },
     },
   },
   plugins: [],
-}
+};

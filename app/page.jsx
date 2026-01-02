@@ -723,6 +723,55 @@ export default function NICUCentralStation() {
 
   // Get alarm statistics from context
   const { criticalCount, warningCount, totalAB, criticalBeds, warningBeds } = getAlarmStats();
+
+  // Filter alarm beds based on acknowledged and silenced states
+  const filteredCriticalBeds = useMemo(() => {
+    const now = Date.now();
+    return criticalBeds.filter(bed => {
+      // Find patient ID for this bed
+      const patient = patients.find(p => p.bed === bed);
+      if (!patient) return true;
+
+      // Check if acknowledged
+      if (acknowledgedAlarms.includes(patient.id)) return false;
+
+      // Check if silenced (and not expired)
+      if (silencedBeds[patient.id] && silencedBeds[patient.id] > now) return false;
+
+      return true;
+    });
+  }, [criticalBeds, patients, acknowledgedAlarms, silencedBeds]);
+
+  const filteredWarningBeds = useMemo(() => {
+    return warningBeds.filter(bed => {
+      const patient = patients.find(p => p.bed === bed);
+      if (!patient) return true;
+
+      // Check if acknowledged
+      if (acknowledgedAlarms.includes(patient.id)) return false;
+
+      return true;
+    });
+  }, [warningBeds, patients, acknowledgedAlarms]);
+
+  // Clean up expired silences
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      setSilencedBeds(prev => {
+        const updated = { ...prev };
+        let changed = false;
+        for (const [id, expiry] of Object.entries(updated)) {
+          if (expiry <= now) {
+            delete updated[id];
+            changed = true;
+          }
+        }
+        return changed ? updated : prev;
+      });
+    }, 1000);
+    return () => clearInterval(cleanupInterval);
+  }, []);
   
   return (
     <div className="min-h-screen flex" style={{ background: '#000508', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -834,13 +883,13 @@ export default function NICUCentralStation() {
       
       {/* Warning Alarm Banner */}
       <WarningAlarmBanner
-        warningBeds={warningBeds}
+        warningBeds={filteredWarningBeds}
         onAcknowledge={handleAcknowledgeAll}
       />
 
       {/* Critical Alarm Banner with Auto-Playing Sound */}
       <CriticalAlarmBanner
-        criticalBeds={criticalBeds}
+        criticalBeds={filteredCriticalBeds}
         onAcknowledge={handleAcknowledgeAll}
         onSilence={handleSilenceAlarms}
       />

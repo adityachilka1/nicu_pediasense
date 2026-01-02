@@ -1,32 +1,33 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import AppShell from '../../components/AppShell';
 import { FENTON_PERCENTILES } from '../../lib/data';
 
-const patients = [
-  { id: 'NB-2024-0892', name: 'Baby Martinez', ga: '28+3', dob: '2024-12-15', currentWeight: 1180, birthWeight: 980 },
-  { id: 'NB-2024-0891', name: 'Baby Thompson', ga: '32+1', dob: '2024-12-18', currentWeight: 1650, birthWeight: 1520 },
-  { id: 'NB-2024-0890', name: 'Baby Williams', ga: '26+5', dob: '2024-12-10', currentWeight: 890, birthWeight: 720 },
-];
-
-const growthData = {
-  'NB-2024-0892': {
-    measurements: [
-      { date: '2024-12-15', day: 0, weight: 980, length: 36.5, hc: 25.2, pca: '28+3' },
-      { date: '2024-12-17', day: 2, weight: 935, length: 36.5, hc: 25.2, pca: '28+5' },
-      { date: '2024-12-19', day: 4, weight: 960, length: 36.8, hc: 25.4, pca: '29+0' },
-      { date: '2024-12-22', day: 7, weight: 1020, length: 37.2, hc: 25.8, pca: '29+3' },
-      { date: '2024-12-25', day: 10, weight: 1085, length: 37.8, hc: 26.2, pca: '29+6' },
-      { date: '2024-12-28', day: 13, weight: 1150, length: 38.5, hc: 26.7, pca: '30+2' },
-      { date: '2024-12-29', day: 14, weight: 1180, length: 38.8, hc: 26.9, pca: '30+3' },
-    ],
-    percentiles: { weight: 35, length: 42, hc: 48 },
-    velocities: { weight: 18.2, length: 1.1, hc: 0.85 }
-  }
-};
-
 const fentonPercentiles = [3, 10, 50, 90, 97];
+
+// Loading skeleton component
+const LoadingSkeleton = ({ className }) => (
+  <div className={`animate-pulse bg-slate-700 rounded ${className}`} />
+);
+
+// Error display component
+const ErrorDisplay = ({ message, onRetry }) => (
+  <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 text-center">
+    <svg className="w-8 h-8 text-red-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    <p className="text-red-400 text-sm mb-2">{message}</p>
+    {onRetry && (
+      <button
+        onClick={onRetry}
+        className="px-3 py-1 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 text-sm"
+      >
+        Retry
+      </button>
+    )}
+  </div>
+);
 
 // === FENTON CHART COMPONENT (Medical Standard: Fenton 2013) ===
 // Renders actual Fenton percentile curves for preterm growth tracking
@@ -50,6 +51,7 @@ const FentonChart = ({ chartType, measurements, selectedPatient, fentonPercentil
 
   // Parse PCA to decimal GA
   const pcaToGA = (pca) => {
+    if (!pca) return null;
     const [weeks, days] = pca.split('+').map(Number);
     return weeks + (days / 7);
   };
@@ -108,8 +110,8 @@ const FentonChart = ({ chartType, measurements, selectedPatient, fentonPercentil
     ctx.strokeStyle = 'rgba(71, 85, 105, 0.5)';
     ctx.strokeRect(CHART_PADDING.left, CHART_PADDING.top, chartW, chartH);
 
-    // Determine gender (default male, could be enhanced)
-    const gender = 'male';
+    // Determine gender (default male, can be enhanced with patient data)
+    const gender = selectedPatient?.gender === 'F' ? 'female' : 'male';
     const fentonData = FENTON_PERCENTILES?.[gender]?.[range.dataKey];
 
     // Draw Fenton percentile curves
@@ -165,37 +167,39 @@ const FentonChart = ({ chartType, measurements, selectedPatient, fentonPercentil
 
       const dataKey = chartType === 'hc' ? 'hc' : chartType;
 
-      measurements.forEach((m, i) => {
+      const validMeasurements = measurements.filter(m => {
         const ga = pcaToGA(m.pca);
         const value = m[dataKey];
-        if (ga >= GA_MIN && ga <= GA_MAX && value !== undefined) {
-          const x = gaToX(ga);
-          const y = valToY(value);
-          if (i === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
+        return ga !== null && ga >= GA_MIN && ga <= GA_MAX && value !== undefined && value !== null;
+      });
+
+      validMeasurements.forEach((m, i) => {
+        const ga = pcaToGA(m.pca);
+        const value = m[dataKey];
+        const x = gaToX(ga);
+        const y = valToY(value);
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
         }
       });
       ctx.stroke();
 
       // Draw data points
-      measurements.forEach((m) => {
+      validMeasurements.forEach((m) => {
         const ga = pcaToGA(m.pca);
         const value = m[dataKey];
-        if (ga >= GA_MIN && ga <= GA_MAX && value !== undefined) {
-          const x = gaToX(ga);
-          const y = valToY(value);
+        const x = gaToX(ga);
+        const y = valToY(value);
 
-          ctx.beginPath();
-          ctx.arc(x, y, 5, 0, Math.PI * 2);
-          ctx.fillStyle = '#22d3ee';
-          ctx.fill();
-          ctx.strokeStyle = '#0e7490';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#22d3ee';
+        ctx.fill();
+        ctx.strokeStyle = '#0e7490';
+        ctx.lineWidth = 1;
+        ctx.stroke();
       });
     }
 
@@ -261,7 +265,9 @@ const FentonChart = ({ chartType, measurements, selectedPatient, fentonPercentil
           </div>
         </div>
       </div>
-      <div className="text-xs text-slate-500 mb-2">Fenton 2013 Preterm Growth Standards (Male)</div>
+      <div className="text-xs text-slate-500 mb-2">
+        Fenton 2013 Preterm Growth Standards ({selectedPatient?.gender === 'F' ? 'Female' : 'Male'})
+      </div>
       <canvas
         ref={canvasRef}
         className="w-full h-80 rounded-lg"
@@ -272,10 +278,23 @@ const FentonChart = ({ chartType, measurements, selectedPatient, fentonPercentil
 };
 
 export default function GrowthChartsPage() {
-  const [selectedPatient, setSelectedPatient] = useState(patients[0]);
+  // State for patients and growth data
+  const [patients, setPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null);
   const [chartType, setChartType] = useState('weight');
   const [showAddMeasurement, setShowAddMeasurement] = useState(false);
-  const [measurements, setMeasurements] = useState(growthData['NB-2024-0892'].measurements);
+  const [measurements, setMeasurements] = useState([]);
+  const [percentiles, setPercentiles] = useState({ weight: null, length: null, hc: null });
+  const [velocities, setVelocities] = useState({ weight: null, length: null, hc: null });
+
+  // Loading and error states
+  const [loadingPatients, setLoadingPatients] = useState(true);
+  const [loadingGrowth, setLoadingGrowth] = useState(false);
+  const [savingMeasurement, setSavingMeasurement] = useState(false);
+  const [patientError, setPatientError] = useState(null);
+  const [growthError, setGrowthError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
   const [newMeasurement, setNewMeasurement] = useState({
     date: new Date().toISOString().split('T')[0],
     weight: '',
@@ -283,30 +302,178 @@ export default function GrowthChartsPage() {
     hc: ''
   });
 
-  const baseData = growthData[selectedPatient.id] || growthData['NB-2024-0892'];
-  const data = { ...baseData, measurements };
+  // Fetch patients on mount
+  useEffect(() => {
+    fetchPatients();
+  }, []);
 
-  const handleSaveMeasurement = () => {
-    if (newMeasurement.weight && newMeasurement.length && newMeasurement.hc) {
-      const lastMeasurement = measurements[measurements.length - 1];
-      const newDay = lastMeasurement ? lastMeasurement.day + 1 : 0;
-      const gaWeeks = parseInt(selectedPatient.ga.split('+')[0]);
-      const gaDays = parseInt(selectedPatient.ga.split('+')[1]);
-      const pcaWeeks = gaWeeks + Math.floor((gaDays + newDay) / 7);
-      const pcaDays = (gaDays + newDay) % 7;
+  // Fetch growth data when patient changes
+  useEffect(() => {
+    if (selectedPatient?.id) {
+      fetchGrowthData(selectedPatient.id);
+    }
+  }, [selectedPatient?.id]);
 
-      const measurement = {
-        date: newMeasurement.date,
-        day: newDay,
-        weight: parseInt(newMeasurement.weight),
-        length: parseFloat(newMeasurement.length),
-        hc: parseFloat(newMeasurement.hc),
-        pca: `${pcaWeeks}+${pcaDays}`
-      };
+  const fetchPatients = async () => {
+    setLoadingPatients(true);
+    setPatientError(null);
 
-      setMeasurements([...measurements, measurement]);
-      setNewMeasurement({ date: new Date().toISOString().split('T')[0], weight: '', length: '', hc: '' });
+    try {
+      const response = await fetch('/api/patients?includeDischarged=false&limit=50');
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Failed to fetch patients (${response.status})`);
+      }
+
+      const result = await response.json();
+      const patientData = result.data || [];
+
+      // Transform patient data for growth charts
+      const transformed = patientData.map(p => ({
+        id: p.id,
+        mrn: p.mrn,
+        name: p.name,
+        ga: p.ga || '--',
+        gender: p.gender,
+        dob: p.admitDate?.split('T')[0] || '--',
+        currentWeight: p.weight ? Math.round(p.weight * 1000) : null, // Convert kg to g
+        birthWeight: p.birthWeight ? Math.round(p.birthWeight * 1000) : null,
+        dayOfLife: p.dol || 1,
+      }));
+
+      setPatients(transformed);
+
+      // Select first patient if available
+      if (transformed.length > 0 && !selectedPatient) {
+        setSelectedPatient(transformed[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching patients:', err);
+      setPatientError(err.message);
+    } finally {
+      setLoadingPatients(false);
+    }
+  };
+
+  const fetchGrowthData = async (patientId) => {
+    setLoadingGrowth(true);
+    setGrowthError(null);
+
+    try {
+      const response = await fetch(`/api/growth/${patientId}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Failed to fetch growth data (${response.status})`);
+      }
+
+      const result = await response.json();
+
+      setMeasurements(result.data?.measurements || []);
+      setPercentiles(result.data?.percentiles || { weight: null, length: null, hc: null });
+      setVelocities(result.data?.velocities || { weight: null, length: null, hc: null });
+    } catch (err) {
+      console.error('Error fetching growth data:', err);
+      setGrowthError(err.message);
+      setMeasurements([]);
+      setPercentiles({ weight: null, length: null, hc: null });
+      setVelocities({ weight: null, length: null, hc: null });
+    } finally {
+      setLoadingGrowth(false);
+    }
+  };
+
+  const handleSaveMeasurement = async () => {
+    if (!selectedPatient) return;
+
+    // Validate at least one measurement is provided
+    const hasWeight = newMeasurement.weight !== '';
+    const hasLength = newMeasurement.length !== '';
+    const hasHC = newMeasurement.hc !== '';
+
+    if (!hasWeight && !hasLength && !hasHC) {
+      setSaveError('At least one measurement is required');
+      return;
+    }
+
+    setSavingMeasurement(true);
+    setSaveError(null);
+
+    try {
+      // Convert weight from grams to kg for API
+      const weightKg = hasWeight ? parseFloat(newMeasurement.weight) / 1000 : null;
+      const lengthCm = hasLength ? parseFloat(newMeasurement.length) : null;
+      const hcCm = hasHC ? parseFloat(newMeasurement.hc) : null;
+
+      // Calculate percentiles for the new measurement if we have patient GA info
+      let calculatedPercentiles = {};
+      if (selectedPatient.ga && selectedPatient.ga !== '--') {
+        const [gaWeeks, gaDays] = selectedPatient.ga.split('+').map(Number);
+
+        // Calculate days since measurement date
+        const birthDate = new Date(selectedPatient.dob);
+        const measurementDate = new Date(newMeasurement.date);
+        const daysSinceBirth = Math.floor((measurementDate - birthDate) / (1000 * 60 * 60 * 24));
+        const totalDays = gaWeeks * 7 + (gaDays || 0) + daysSinceBirth;
+        const pcaWeeks = Math.floor(totalDays / 7);
+        const pcaDays = totalDays % 7;
+
+        try {
+          const percentileResponse = await fetch(
+            `/api/growth/percentiles?gender=${selectedPatient.gender || 'M'}&gaWeeks=${pcaWeeks}&gaDays=${pcaDays}` +
+            `${weightKg ? `&weight=${weightKg * 1000}` : ''}` + // Send weight in grams for percentile calc
+            `${lengthCm ? `&length=${lengthCm}` : ''}` +
+            `${hcCm ? `&headCirc=${hcCm}` : ''}`
+          );
+
+          if (percentileResponse.ok) {
+            const percentileResult = await percentileResponse.json();
+            calculatedPercentiles = percentileResult.data?.percentiles || {};
+          }
+        } catch (percentileErr) {
+          console.warn('Could not calculate percentiles:', percentileErr);
+        }
+      }
+
+      const response = await fetch('/api/growth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          patientId: selectedPatient.id,
+          weight: weightKg,
+          length: lengthCm,
+          headCirc: hcCm,
+          weightPercentile: calculatedPercentiles.weight || null,
+          lengthPercentile: calculatedPercentiles.length || null,
+          headCircPercentile: calculatedPercentiles.headCirc || null,
+          measuredAt: new Date(newMeasurement.date).toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Failed to save measurement (${response.status})`);
+      }
+
+      // Refresh growth data
+      await fetchGrowthData(selectedPatient.id);
+
+      // Reset form and close modal
+      setNewMeasurement({
+        date: new Date().toISOString().split('T')[0],
+        weight: '',
+        length: '',
+        hc: ''
+      });
       setShowAddMeasurement(false);
+    } catch (err) {
+      console.error('Error saving measurement:', err);
+      setSaveError(err.message);
+    } finally {
+      setSavingMeasurement(false);
     }
   };
 
@@ -317,11 +484,22 @@ export default function GrowthChartsPage() {
   ];
 
   const getPercentileColor = (p) => {
+    if (p === null || p === undefined) return 'text-slate-500';
     if (p < 10) return 'text-red-400';
     if (p < 25) return 'text-yellow-400';
     if (p <= 75) return 'text-green-400';
     if (p <= 90) return 'text-yellow-400';
     return 'text-red-400';
+  };
+
+  const formatPercentile = (p) => {
+    if (p === null || p === undefined) return '--';
+    return `${Math.round(p)}th %ile`;
+  };
+
+  const formatVelocity = (v, unit) => {
+    if (v === null || v === undefined) return '--';
+    return `${v} ${unit}`;
   };
 
   return (
@@ -335,7 +513,8 @@ export default function GrowthChartsPage() {
           </div>
           <button
             onClick={() => setShowAddMeasurement(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30"
+            disabled={!selectedPatient}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -348,66 +527,107 @@ export default function GrowthChartsPage() {
           {/* Patient Selector */}
           <div className="col-span-3 bg-slate-800 rounded-xl p-4 border border-slate-700">
             <h3 className="text-sm font-medium text-slate-400 mb-3">Select Patient</h3>
-            <div className="space-y-2">
-              {patients.map((patient) => (
-                <button
-                  key={patient.id}
-                  onClick={() => setSelectedPatient(patient)}
-                  className={`w-full p-3 rounded-lg text-left transition-colors ${
-                    selectedPatient.id === patient.id
-                      ? 'bg-cyan-500/20 border border-cyan-500/50'
-                      : 'bg-slate-700/50 hover:bg-slate-700 border border-transparent'
-                  }`}
-                >
-                  <div className="font-medium text-white text-sm">{patient.name}</div>
-                  <div className="text-xs text-slate-400">GA: {patient.ga} • {patient.currentWeight}g</div>
-                </button>
-              ))}
-            </div>
+
+            {loadingPatients ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <LoadingSkeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : patientError ? (
+              <ErrorDisplay message={patientError} onRetry={fetchPatients} />
+            ) : patients.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-4">No patients found</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {patients.map((patient) => (
+                  <button
+                    key={patient.id}
+                    onClick={() => setSelectedPatient(patient)}
+                    className={`w-full p-3 rounded-lg text-left transition-colors ${
+                      selectedPatient?.id === patient.id
+                        ? 'bg-cyan-500/20 border border-cyan-500/50'
+                        : 'bg-slate-700/50 hover:bg-slate-700 border border-transparent'
+                    }`}
+                  >
+                    <div className="font-medium text-white text-sm">{patient.name}</div>
+                    <div className="text-xs text-slate-400">
+                      GA: {patient.ga} | {patient.currentWeight ? `${patient.currentWeight}g` : '--'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Current Stats */}
-            <div className="mt-6 pt-4 border-t border-slate-700">
-              <h3 className="text-sm font-medium text-slate-400 mb-3">Current Percentiles</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-300">Weight</span>
-                  <span className={`text-sm font-medium ${getPercentileColor(data.percentiles.weight)}`}>
-                    {data.percentiles.weight}th %ile
-                  </span>
+            {selectedPatient && (
+              <>
+                <div className="mt-6 pt-4 border-t border-slate-700">
+                  <h3 className="text-sm font-medium text-slate-400 mb-3">Current Percentiles</h3>
+                  {loadingGrowth ? (
+                    <div className="space-y-2">
+                      <LoadingSkeleton className="h-6 w-full" />
+                      <LoadingSkeleton className="h-6 w-full" />
+                      <LoadingSkeleton className="h-6 w-full" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-300">Weight</span>
+                        <span className={`text-sm font-medium ${getPercentileColor(percentiles.weight)}`}>
+                          {formatPercentile(percentiles.weight)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-300">Length</span>
+                        <span className={`text-sm font-medium ${getPercentileColor(percentiles.length)}`}>
+                          {formatPercentile(percentiles.length)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-300">Head Circ.</span>
+                        <span className={`text-sm font-medium ${getPercentileColor(percentiles.hc)}`}>
+                          {formatPercentile(percentiles.hc)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-300">Length</span>
-                  <span className={`text-sm font-medium ${getPercentileColor(data.percentiles.length)}`}>
-                    {data.percentiles.length}th %ile
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-300">Head Circ.</span>
-                  <span className={`text-sm font-medium ${getPercentileColor(data.percentiles.hc)}`}>
-                    {data.percentiles.hc}th %ile
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            {/* Growth Velocity */}
-            <div className="mt-6 pt-4 border-t border-slate-700">
-              <h3 className="text-sm font-medium text-slate-400 mb-3">Growth Velocity</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-300">Weight</span>
-                  <span className="text-sm font-medium text-green-400">{data.velocities.weight} g/kg/day</span>
+                {/* Growth Velocity */}
+                <div className="mt-6 pt-4 border-t border-slate-700">
+                  <h3 className="text-sm font-medium text-slate-400 mb-3">Growth Velocity</h3>
+                  {loadingGrowth ? (
+                    <div className="space-y-2">
+                      <LoadingSkeleton className="h-6 w-full" />
+                      <LoadingSkeleton className="h-6 w-full" />
+                      <LoadingSkeleton className="h-6 w-full" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-300">Weight</span>
+                        <span className="text-sm font-medium text-green-400">
+                          {formatVelocity(velocities.weight, 'g/kg/day')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-300">Length</span>
+                        <span className="text-sm font-medium text-green-400">
+                          {formatVelocity(velocities.length, 'cm/wk')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-300">Head Circ.</span>
+                        <span className="text-sm font-medium text-green-400">
+                          {formatVelocity(velocities.hc, 'cm/wk')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-300">Length</span>
-                  <span className="text-sm font-medium text-green-400">{data.velocities.length} cm/wk</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-300">Head Circ.</span>
-                  <span className="text-sm font-medium text-green-400">{data.velocities.hc} cm/wk</span>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Chart Area */}
@@ -430,53 +650,90 @@ export default function GrowthChartsPage() {
             </div>
 
             {/* Chart - Fenton 2013 Percentile Chart */}
-            <FentonChart
-              chartType={chartType}
-              measurements={data.measurements}
-              selectedPatient={selectedPatient}
-              fentonPercentiles={fentonPercentiles}
-            />
+            {growthError ? (
+              <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                <ErrorDisplay message={growthError} onRetry={() => fetchGrowthData(selectedPatient?.id)} />
+              </div>
+            ) : loadingGrowth ? (
+              <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+                <LoadingSkeleton className="h-80 w-full" />
+              </div>
+            ) : (
+              <FentonChart
+                chartType={chartType}
+                measurements={measurements}
+                selectedPatient={selectedPatient}
+                fentonPercentiles={fentonPercentiles}
+              />
+            )}
 
             {/* Measurements Table */}
             <div className="bg-slate-800 rounded-xl border border-slate-700">
               <div className="p-4 border-b border-slate-700">
                 <h3 className="font-semibold text-white">Measurement History</h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-xs text-slate-400 border-b border-slate-700">
-                      <th className="p-3">Date</th>
-                      <th className="p-3">DOL</th>
-                      <th className="p-3">PCA</th>
-                      <th className="p-3">Weight (g)</th>
-                      <th className="p-3">Δ Weight</th>
-                      <th className="p-3">Length (cm)</th>
-                      <th className="p-3">HC (cm)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.measurements.map((m, i) => (
-                      <tr key={i} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                        <td className="p-3 text-sm text-white">{m.date}</td>
-                        <td className="p-3 text-sm text-slate-300">{m.day}</td>
-                        <td className="p-3 text-sm text-slate-300">{m.pca}</td>
-                        <td className="p-3 text-sm text-cyan-400 font-medium">{m.weight}</td>
-                        <td className="p-3 text-sm">
-                          {i > 0 && (
-                            <span className={m.weight > data.measurements[i-1].weight ? 'text-green-400' : 'text-red-400'}>
-                              {m.weight > data.measurements[i-1].weight ? '+' : ''}
-                              {m.weight - data.measurements[i-1].weight}g
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3 text-sm text-slate-300">{m.length}</td>
-                        <td className="p-3 text-sm text-slate-300">{m.hc}</td>
+              {loadingGrowth ? (
+                <div className="p-4 space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <LoadingSkeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : measurements.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  <svg className="w-12 h-12 mx-auto mb-2 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <p>No measurements recorded</p>
+                  <button
+                    onClick={() => setShowAddMeasurement(true)}
+                    className="mt-2 text-cyan-400 hover:text-cyan-300 text-sm"
+                  >
+                    Add first measurement
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-left text-xs text-slate-400 border-b border-slate-700">
+                        <th className="p-3">Date</th>
+                        <th className="p-3">DOL</th>
+                        <th className="p-3">PCA</th>
+                        <th className="p-3">Weight (g)</th>
+                        <th className="p-3">Change</th>
+                        <th className="p-3">Length (cm)</th>
+                        <th className="p-3">HC (cm)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {measurements.map((m, i) => (
+                        <tr key={m.id || i} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                          <td className="p-3 text-sm text-white">{m.date}</td>
+                          <td className="p-3 text-sm text-slate-300">{m.day}</td>
+                          <td className="p-3 text-sm text-slate-300">{m.pca || '--'}</td>
+                          <td className="p-3 text-sm text-cyan-400 font-medium">
+                            {m.weight !== null ? m.weight : '--'}
+                          </td>
+                          <td className="p-3 text-sm">
+                            {i > 0 && m.weight !== null && measurements[i-1]?.weight !== null && (
+                              <span className={m.weight > measurements[i-1].weight ? 'text-green-400' : 'text-red-400'}>
+                                {m.weight > measurements[i-1].weight ? '+' : ''}
+                                {m.weight - measurements[i-1].weight}g
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-sm text-slate-300">
+                            {m.length !== null ? m.length : '--'}
+                          </td>
+                          <td className="p-3 text-sm text-slate-300">
+                            {m.hc !== null ? m.hc : '--'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -486,7 +743,20 @@ export default function GrowthChartsPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md border border-slate-700">
               <h3 className="text-lg font-semibold text-white mb-4">Add Measurement</h3>
+
+              {saveError && (
+                <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                  {saveError}
+                </div>
+              )}
+
               <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Patient</label>
+                  <div className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white">
+                    {selectedPatient?.name || 'No patient selected'}
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Date</label>
                   <input
@@ -504,6 +774,8 @@ export default function GrowthChartsPage() {
                       value={newMeasurement.weight}
                       onChange={(e) => setNewMeasurement({ ...newMeasurement, weight: e.target.value })}
                       placeholder="1200"
+                      min="100"
+                      max="15000"
                       className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
                     />
                   </div>
@@ -515,6 +787,8 @@ export default function GrowthChartsPage() {
                       value={newMeasurement.length}
                       onChange={(e) => setNewMeasurement({ ...newMeasurement, length: e.target.value })}
                       placeholder="38.5"
+                      min="20"
+                      max="80"
                       className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
                     />
                   </div>
@@ -526,22 +800,48 @@ export default function GrowthChartsPage() {
                       value={newMeasurement.hc}
                       onChange={(e) => setNewMeasurement({ ...newMeasurement, hc: e.target.value })}
                       placeholder="27.0"
+                      min="15"
+                      max="50"
                       className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
                     />
                   </div>
                 </div>
+                <p className="text-xs text-slate-500">
+                  At least one measurement is required. Percentiles will be calculated automatically.
+                </p>
                 <div className="flex gap-3 pt-4">
                   <button
-                    onClick={() => setShowAddMeasurement(false)}
-                    className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600"
+                    onClick={() => {
+                      setShowAddMeasurement(false);
+                      setSaveError(null);
+                      setNewMeasurement({
+                        date: new Date().toISOString().split('T')[0],
+                        weight: '',
+                        length: '',
+                        hc: ''
+                      });
+                    }}
+                    disabled={savingMeasurement}
+                    className="flex-1 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSaveMeasurement}
-                    className="flex-1 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
+                    disabled={savingMeasurement}
+                    className="flex-1 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    Save
+                    {savingMeasurement ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save'
+                    )}
                   </button>
                 </div>
               </div>

@@ -14,35 +14,36 @@ datasource db {
 // =====================================================
 
 model User {
-  id            Int       @id @default(autoincrement())
-  email         String    @unique
-  passwordHash  String    @map("password_hash")
-  fullName      String    @map("full_name")
-  role          String    // admin, physician, charge_nurse, staff_nurse, administrative
-  initials      String?
-  active        Boolean   @default(true)
-  lastLogin     DateTime? @map("last_login")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  role         String // admin, physician, charge_nurse, staff_nurse, administrative
+  initials     String?
+  active       Boolean   @default(true)
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  notes         Note[]
-  alarmAcks     AlarmAcknowledgment[]
-  auditLogs     AuditLog[]
+  notes          Note[]
+  alarmAcks      AlarmAcknowledgment[]
+  auditLogs      AuditLog[]
   familyMessages FamilyMessage[]
-  notifications Notification[]
+  notifications  Notification[]
 
   // Clinical workflow relations
-  ordersCreated       Order[]          @relation("OrderingUser")
-  ordersDiscontinued  Order[]          @relation("DiscontinuedByUser")
-  carePlansCreated    CarePlan[]       @relation("CarePlanCreatedBy")
+  ordersCreated         Order[]         @relation("OrderingUser")
+  ordersDiscontinued    Order[]         @relation("DiscontinuedByUser")
+  carePlansCreated      CarePlan[]      @relation("CarePlanCreatedBy")
   dischargePlansCreated DischargePlan[] @relation("DischargePlanCreatedBy")
-  handoffNotesAuthored HandoffNote[]   @relation("HandoffAuthor")
-  handoffNotesAcked   HandoffNote[]    @relation("HandoffAcknowledger")
+  handoffNotesAuthored  HandoffNote[]   @relation("HandoffAuthor")
+  handoffNotesAcked     HandoffNote[]   @relation("HandoffAcknowledger")
+  milestonesCreated     Milestone[]     @relation("MilestoneCreatedBy")
 
   // Indexes for common queries
-  @@index([role])                    // Filter users by role
-  @@index([active])                  // Filter active/inactive users
+  @@index([role]) // Filter users by role
+  @@index([active]) // Filter active/inactive users
   @@map("users")
 }
 
@@ -51,47 +52,47 @@ model User {
 // =====================================================
 
 model Bed {
-  id          Int       @id @default(autoincrement())
-  bedNumber   String    @unique @map("bed_number")
-  unit        String    @default("NICU")
-  status      String    @default("available") // available, occupied, cleaning, maintenance
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id        Int      @id @default(autoincrement())
+  bedNumber String   @unique @map("bed_number")
+  unit      String   @default("NICU")
+  status    String   @default("available") // available, occupied, cleaning, maintenance
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  patient     Patient?
-  devices     Device[]
+  patient Patient?
+  devices Device[]
 
   @@map("beds")
 }
 
 model Patient {
-  id              Int       @id @default(autoincrement())
-  mrn             String    @unique // Medical Record Number
-  name            String
-  dateOfBirth     DateTime  @map("date_of_birth")
-  gender          String    // M, F, U
+  id          Int      @id @default(autoincrement())
+  mrn         String   @unique // Medical Record Number
+  name        String
+  dateOfBirth DateTime @map("date_of_birth")
+  gender      String // M, F, U
 
   // NICU-specific fields
-  gestationalAge  String?   @map("gestational_age") // e.g., "32+4"
-  birthWeight     Float?    @map("birth_weight") // kg
-  currentWeight   Float?    @map("current_weight") // kg
-  dayOfLife       Int       @default(1) @map("day_of_life")
+  gestationalAge String? @map("gestational_age") // e.g., "32+4"
+  birthWeight    Float?  @map("birth_weight") // kg
+  currentWeight  Float?  @map("current_weight") // kg
+  dayOfLife      Int     @default(1) @map("day_of_life")
 
   // Assignment
-  bedId           Int?      @unique @map("bed_id")
-  bed             Bed?      @relation(fields: [bedId], references: [id])
+  bedId Int? @unique @map("bed_id")
+  bed   Bed? @relation(fields: [bedId], references: [id])
 
   // Status
-  status          String    @default("normal") // normal, warning, critical, discharged
-  admitDate       DateTime  @default(now()) @map("admit_date")
-  dischargeDate   DateTime? @map("discharge_date")
+  status        String    @default("normal") // normal, warning, critical, discharged
+  admitDate     DateTime  @default(now()) @map("admit_date")
+  dischargeDate DateTime? @map("discharge_date")
 
   // Alarm limits (JSON stored as string in SQLite)
-  alarmLimits     String?   @map("alarm_limits") // JSON: { spo2: [88, 100], pr: [100, 180], rr: [25, 70] }
+  alarmLimits String? @map("alarm_limits") // JSON: { spo2: [88, 100], pr: [100, 180], rr: [25, 70] }
 
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   vitals             Vital[]
@@ -103,16 +104,17 @@ model Patient {
   flowsheetEntries   FlowsheetEntry[]
 
   // Clinical workflow relations
-  orders             Order[]
-  carePlans          CarePlan[]
-  dischargePlan      DischargePlan?
-  handoffNotes       HandoffNote[]
+  orders        Order[]
+  carePlans     CarePlan[]
+  dischargePlan DischargePlan?
+  handoffNotes  HandoffNote[]
+  milestones    Milestone[]
 
   // Indexes for common queries
-  @@index([status])                    // Filter by patient status
-  @@index([status, dischargeDate])     // Active patients query (status != discharged)
-  @@index([admitDate])                 // Sort/filter by admission date
-  @@index([name])                      // Search patients by name
+  @@index([status]) // Filter by patient status
+  @@index([status, dischargeDate]) // Active patients query (status != discharged)
+  @@index([admitDate]) // Sort/filter by admission date
+  @@index([name]) // Search patients by name
   @@map("patients")
 }
 
@@ -121,26 +123,26 @@ model Patient {
 // =====================================================
 
 model Vital {
-  id          Int       @id @default(autoincrement())
-  patientId   Int       @map("patient_id")
-  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   // Vital signs
-  heartRate   Int?      @map("heart_rate") // bpm (PR - Pulse Rate)
-  spo2        Int?      // %
-  respRate    Int?      @map("resp_rate") // breaths/min
-  temperature Float?    // Celsius
-  fio2        Int?      // % Fraction of Inspired O2
-  pi          Float?    // Perfusion Index
+  heartRate   Int?   @map("heart_rate") // bpm (PR - Pulse Rate)
+  spo2        Int? // %
+  respRate    Int?   @map("resp_rate") // breaths/min
+  temperature Float? // Celsius
+  fio2        Int? // % Fraction of Inspired O2
+  pi          Float? // Perfusion Index
 
   // Blood pressure (optional)
-  bpSystolic  Int?      @map("bp_systolic")
-  bpDiastolic Int?      @map("bp_diastolic")
-  bpMean      Int?      @map("bp_mean")
+  bpSystolic  Int? @map("bp_systolic")
+  bpDiastolic Int? @map("bp_diastolic")
+  bpMean      Int? @map("bp_mean")
 
   // Metadata
-  source      String    @default("monitor") // monitor, manual, device
-  recordedAt  DateTime  @default(now()) @map("recorded_at")
+  source     String   @default("monitor") // monitor, manual, device
+  recordedAt DateTime @default(now()) @map("recorded_at")
 
   @@index([patientId, recordedAt])
   @@map("vitals")
@@ -151,15 +153,15 @@ model Vital {
 // =====================================================
 
 model Alarm {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  type          String    // critical, warning, advisory
-  parameter     String    // spo2, pr, rr, temp, apnea, brady
-  value         Float?    // The value that triggered the alarm
-  threshold     Float?    // The threshold that was violated
-  message       String
+  type      String // critical, warning, advisory
+  parameter String // spo2, pr, rr, temp, apnea, brady
+  value     Float? // The value that triggered the alarm
+  threshold Float? // The threshold that was violated
+  message   String
 
   // Status
   status        String    @default("active") // active, acknowledged, silenced, resolved
@@ -171,27 +173,27 @@ model Alarm {
   acknowledgments AlarmAcknowledgment[]
 
   // Indexes for common queries
-  @@index([patientId, status])         // Patient's alarms by status
-  @@index([triggeredAt])               // Sort by trigger time
-  @@index([type, status])              // Filter by alarm type and status (dashboard)
-  @@index([status, triggeredAt])       // Active alarms sorted by time
+  @@index([patientId, status]) // Patient's alarms by status
+  @@index([triggeredAt]) // Sort by trigger time
+  @@index([type, status]) // Filter by alarm type and status (dashboard)
+  @@index([status, triggeredAt]) // Active alarms sorted by time
   @@map("alarms")
 }
 
 model AlarmAcknowledgment {
-  id          Int       @id @default(autoincrement())
-  alarmId     Int       @map("alarm_id")
-  alarm       Alarm     @relation(fields: [alarmId], references: [id], onDelete: Cascade)
-  userId      Int       @map("user_id")
-  user        User      @relation(fields: [userId], references: [id])
+  id      Int   @id @default(autoincrement())
+  alarmId Int   @map("alarm_id")
+  alarm   Alarm @relation(fields: [alarmId], references: [id], onDelete: Cascade)
+  userId  Int   @map("user_id")
+  user    User  @relation(fields: [userId], references: [id])
 
-  action      String    // acknowledged, silenced, escalated
-  note        String?
-  createdAt   DateTime  @default(now()) @map("created_at")
+  action    String // acknowledged, silenced, escalated
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Indexes for common queries
-  @@index([alarmId])                   // Find acknowledgments for an alarm
-  @@index([userId, createdAt])         // User's acknowledgment history
+  @@index([alarmId]) // Find acknowledgments for an alarm
+  @@index([userId, createdAt]) // User's acknowledgment history
   @@map("alarm_acknowledgments")
 }
 
@@ -200,22 +202,22 @@ model AlarmAcknowledgment {
 // =====================================================
 
 model Note {
-  id          Int       @id @default(autoincrement())
-  patientId   Int       @map("patient_id")
-  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  authorId    Int       @map("author_id")
-  author      User      @relation(fields: [authorId], references: [id])
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  authorId  Int     @map("author_id")
+  author    User    @relation(fields: [authorId], references: [id])
 
-  type        String    @default("progress") // progress, nursing, physician, handoff
-  content     String
+  type    String @default("progress") // progress, nursing, physician, handoff
+  content String
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Indexes for common queries
-  @@index([patientId, createdAt])       // Patient's notes sorted by time
+  @@index([patientId, createdAt]) // Patient's notes sorted by time
   @@index([patientId, type, createdAt]) // Filtered notes by type
-  @@index([authorId, createdAt])        // Author's notes ("my notes" view)
+  @@index([authorId, createdAt]) // Author's notes ("my notes" view)
   @@map("notes")
 }
 
@@ -224,17 +226,17 @@ model Note {
 // =====================================================
 
 model AuditLog {
-  id          Int       @id @default(autoincrement())
-  userId      Int?      @map("user_id")
-  user        User?     @relation(fields: [userId], references: [id])
+  id     Int   @id @default(autoincrement())
+  userId Int?  @map("user_id")
+  user   User? @relation(fields: [userId], references: [id])
 
-  action      String    // login, logout, view_patient, update_patient, acknowledge_alarm, etc.
-  resource    String?   // patient, alarm, note, etc.
-  resourceId  Int?      @map("resource_id")
-  details     String?   // JSON with additional context
-  ipAddress   String?   @map("ip_address")
+  action     String // login, logout, view_patient, update_patient, acknowledge_alarm, etc.
+  resource   String? // patient, alarm, note, etc.
+  resourceId Int?    @map("resource_id")
+  details    String? // JSON with additional context
+  ipAddress  String? @map("ip_address")
 
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
@@ -246,16 +248,16 @@ model AuditLog {
 // =====================================================
 
 model Device {
-  id              Int       @id @default(autoincrement())
-  serialNumber    String    @unique @map("serial_number")
-  name            String
-  type            String    // monitor, ventilator, infusion_pump, phototherapy, cpap, incubator, pulse_oximeter, ecg
-  manufacturer    String?
-  model           String?
+  id           Int     @id @default(autoincrement())
+  serialNumber String  @unique @map("serial_number")
+  name         String
+  type         String // monitor, ventilator, infusion_pump, phototherapy, cpap, incubator, pulse_oximeter, ecg
+  manufacturer String?
+  model        String?
 
   // Assignment
-  bedId           Int?      @map("bed_id")
-  bed             Bed?      @relation(fields: [bedId], references: [id])
+  bedId Int? @map("bed_id")
+  bed   Bed? @relation(fields: [bedId], references: [id])
 
   // Status
   status          String    @default("active") // active, inactive, maintenance, offline, error
@@ -263,7 +265,7 @@ model Device {
   firmwareVersion String?   @map("firmware_version")
 
   // Configuration (JSON stored as string in SQLite)
-  config          String?   // JSON: { ip: "...", port: ..., protocol: "...", settings: {...} }
+  config String? // JSON: { ip: "...", port: ..., protocol: "...", settings: {...} }
 
   // Calibration & Maintenance
   lastCalibration DateTime? @map("last_calibration")
@@ -271,11 +273,11 @@ model Device {
   lastMaintenance DateTime? @map("last_maintenance")
   nextMaintenance DateTime? @map("next_maintenance")
 
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  logs            DeviceLog[]
+  logs DeviceLog[]
 
   @@index([bedId])
   @@index([type, status])
@@ -283,19 +285,19 @@ model Device {
 }
 
 model DeviceLog {
-  id          Int       @id @default(autoincrement())
-  deviceId    Int       @map("device_id")
-  device      Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  id       Int    @id @default(autoincrement())
+  deviceId Int    @map("device_id")
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
-  level       String    @default("info") // info, warning, error, critical
-  category    String    // status_change, calibration, maintenance, error, alert, connection, data_transmission
-  message     String
-  details     String?   // JSON with additional context
+  level    String  @default("info") // info, warning, error, critical
+  category String // status_change, calibration, maintenance, error, alert, connection, data_transmission
+  message  String
+  details  String? // JSON with additional context
 
   // Optional user association (for manual entries)
-  userId      Int?      @map("user_id")
+  userId Int? @map("user_id")
 
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([deviceId, createdAt])
   @@index([level, createdAt])
@@ -307,20 +309,20 @@ model DeviceLog {
 // =====================================================
 
 model AlarmLimitPreset {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique // preterm_24_28, preterm_28_32, preterm_32_37, term, custom
-  displayName String    @map("display_name") // "Preterm (24-28 weeks)", etc.
+  id          Int     @id @default(autoincrement())
+  name        String  @unique // preterm_24_28, preterm_28_32, preterm_32_37, term, custom
+  displayName String  @map("display_name") // "Preterm (24-28 weeks)", etc.
   description String?
 
   // Limits (JSON stored as string in SQLite)
   // Format: { parameter: [min, max], ... }
-  limits      String    // JSON: { spo2: [88, 95], pr: [100, 180], rr: [30, 70], temp: [36.5, 37.5] }
+  limits String // JSON: { spo2: [88, 95], pr: [100, 180], rr: [30, 70], temp: [36.5, 37.5] }
 
-  isDefault   Boolean   @default(false) @map("is_default")
-  isActive    Boolean   @default(true) @map("is_active")
+  isDefault Boolean @default(false) @map("is_default")
+  isActive  Boolean @default(true) @map("is_active")
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("alarm_limit_presets")
 }
@@ -330,24 +332,48 @@ model AlarmLimitPreset {
 // =====================================================
 
 model GrowthMeasurement {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  weight        Float?    // kg
-  length        Float?    // cm
-  headCirc      Float?    @map("head_circ") // cm (head circumference)
+  // Anthropometric measurements
+  weight        Float? // kg
+  length        Float? // cm
+  headCirc      Float? @map("head_circ") // cm (head circumference)
+  abdominalCirc Float? @map("abdominal_circ") // cm (abdominal circumference)
+  chestCirc     Float? @map("chest_circ") // cm (chest circumference)
 
-  // Percentiles (calculated based on gestational age)
-  weightPercentile   Float?  @map("weight_percentile")
-  lengthPercentile   Float?  @map("length_percentile")
-  headCircPercentile Float?  @map("head_circ_percentile")
+  // Calculated values
+  weightChange        Float? @map("weight_change") // kg since last measurement
+  weightChangePercent Float? @map("weight_change_percent") // % change
 
-  measuredBy    String?   @map("measured_by") // User initials or name
-  notes         String?
-  measuredAt    DateTime  @default(now()) @map("measured_at")
+  // Percentiles (calculated based on gestational age using Fenton/WHO curves)
+  weightPercentile   Float? @map("weight_percentile")
+  lengthPercentile   Float? @map("length_percentile")
+  headCircPercentile Float? @map("head_circ_percentile")
+
+  // Z-scores
+  weightZScore   Float? @map("weight_z_score")
+  lengthZScore   Float? @map("length_z_score")
+  headCircZScore Float? @map("head_circ_z_score")
+
+  // Growth velocity
+  velocityGrams Float? @map("velocity_grams") // g/kg/day
+
+  // Context
+  correctedAge    String? @map("corrected_age") // Corrected gestational age at measurement
+  measurementType String  @default("routine") @map("measurement_type") // routine, admission, discharge, weekly
+
+  // Audit fields
+  measuredBy String?  @map("measured_by") // User initials or name
+  verifiedBy String?  @map("verified_by") // For QA/verification
+  notes      String?
+  measuredAt DateTime @default(now()) @map("measured_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@index([patientId, measuredAt])
+  @@index([patientId, measurementType])
   @@map("growth_measurements")
 }
 
@@ -355,30 +381,94 @@ model GrowthMeasurement {
 // FEEDING LOGS
 // =====================================================
 
+enum FeedingType {
+  BREAST_MILK
+  DONOR_MILK
+  FORMULA
+  FORTIFIED_BREAST_MILK
+  FORTIFIED_FORMULA
+  TPN
+  MIXED
+}
+
+enum FeedingRoute {
+  ORAL
+  NG_TUBE // Nasogastric
+  OG_TUBE // Orogastric
+  GT_TUBE // Gastrostomy
+  NJ_TUBE // Nasojejunal
+  IV // For TPN/lipids
+}
+
+enum FeedingTolerance {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  INTOLERANT
+}
+
 model FeedingLog {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  feedingType   String    @map("feeding_type") // breast, formula, fortified, tpn, enteral
-  route         String    // oral, ng (nasogastric), og (orogastric), gt (gastrostomy)
-  volumeOrdered Float?    @map("volume_ordered") // mL
-  volumeGiven   Float?    @map("volume_given") // mL
-  volumeResidual Float?   @map("volume_residual") // mL (gastric residual)
-  residualColor String?   @map("residual_color") // clear, bilious, bloody, etc.
-  tolerance     String?   // good, fair, poor
-  emesis        Boolean   @default(false)
-  emesisAmount  Float?    @map("emesis_amount") // mL
+  // Feeding details
+  feedingType FeedingType  @map("feeding_type")
+  route       FeedingRoute
 
-  // Fortification details
-  fortified     Boolean   @default(false)
-  calories      Int?      // kcal/oz or kcal/100mL
+  // Enteral feeding volumes
+  volumeOrdered       Float?  @map("volume_ordered") // mL
+  volumeGiven         Float?  @map("volume_given") // mL
+  volumeResidual      Float?  @map("volume_residual") // mL (gastric residual)
+  residualColor       String? @map("residual_color") // clear, bilious, bloody, green
+  residualDisposition String? @map("residual_disposition") // refed, discarded
 
-  notes         String?
-  recordedBy    String?   @map("recorded_by")
-  recordedAt    DateTime  @default(now()) @map("recorded_at")
+  // Parenteral nutrition (TPN/Lipids)
+  tpnRate                Float? @map("tpn_rate") // mL/hr
+  tpnVolume              Float? @map("tpn_volume") // mL total for this entry
+  lipidRate              Float? @map("lipid_rate") // mL/hr
+  lipidVolume            Float? @map("lipid_volume") // mL total for this entry
+  dextroseConcentration  Float? @map("dextrose_concentration") // % D10, D12.5, etc.
+  aminoAcidConcentration Float? @map("amino_acid_concentration") // g/dL
+
+  // Tolerance assessment
+  tolerance           FeedingTolerance?
+  emesis              Boolean           @default(false)
+  emesisAmount        Float?            @map("emesis_amount") // mL
+  emesisCharacter     String?           @map("emesis_character") // undigested, bilious, bloody
+  abdominalDistension Boolean           @default(false) @map("abdominal_distension")
+  stoolPassed         Boolean           @default(false) @map("stool_passed")
+
+  // Fortification & nutrition details
+  fortified       Boolean @default(false)
+  fortifierAmount Float?  @map("fortifier_amount") // scoops or mL
+  calories        Float? // kcal/oz or kcal/100mL
+  protein         Float? // g/100mL
+
+  // Breast milk tracking
+  breastMilkSource  String?  @map("breast_milk_source") // mother, donor
+  breastMilkBatchId String?  @map("breast_milk_batch_id") // For tracking donor milk batches
+  expressed         Boolean? // Was this expressed milk vs direct breastfeeding
+
+  // Feeding duration (for oral/breast feeds)
+  feedingDuration Int? @map("feeding_duration") // minutes
+
+  // Timing
+  scheduledTime DateTime? @map("scheduled_time")
+  actualTime    DateTime? @map("actual_time")
+
+  // Audit fields
+  notes      String?
+  recordedBy String?  @map("recorded_by")
+  verifiedBy String?  @map("verified_by")
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@index([patientId, recordedAt])
+  @@index([patientId, feedingType])
+  @@index([recordedAt])
   @@map("feeding_logs")
 }
 
@@ -387,44 +477,84 @@ model FeedingLog {
 // =====================================================
 
 model FlowsheetEntry {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   // Time reference
-  shiftDate     DateTime  @map("shift_date") // Date of the shift
-  hour          Int       // 0-23 hour of recording
+  shiftDate DateTime @map("shift_date") // Date of the shift
+  hour      Int // 0-23 hour of recording
 
   // Intake (mL)
-  ivFluids      Float?    @map("iv_fluids")
-  tpn           Float?    // Total Parenteral Nutrition
+  ivFluids      Float? @map("iv_fluids")
+  tpn           Float? // Total Parenteral Nutrition
   lipids        Float?
-  bloodProducts Float?    @map("blood_products")
+  bloodProducts Float? @map("blood_products")
   medications   Float?
-  enteral       Float?    // Enteral feeds
+  enteral       Float? // Enteral feeds
+  oral          Float? // Oral intake (for older infants)
 
   // Output (mL)
   urine         Float?
   stool         Float?
   emesis        Float?
-  gastricOutput Float?    @map("gastric_output") // OG/NG output
-  ostomyOutput  Float?    @map("ostomy_output")
-  drainOutput   Float?    @map("drain_output")
+  gastricOutput Float? @map("gastric_output") // OG/NG output
+  ostomyOutput  Float? @map("ostomy_output")
+  drainOutput   Float? @map("drain_output")
+  bloodLoss     Float? @map("blood_loss")
+
+  // Insensible losses (calculated)
+  insensibleLoss Float? @map("insensible_loss")
+
+  // Running totals (calculated for the shift)
+  totalIntake Float? @map("total_intake")
+  totalOutput Float? @map("total_output")
+  netBalance  Float? @map("net_balance")
 
   // Stool characteristics
-  stoolCount    Int?      @map("stool_count")
-  stoolType     String?   @map("stool_type") // meconium, transitional, normal, loose, watery
+  stoolCount Int?    @map("stool_count")
+  stoolType  String? @map("stool_type") // meconium, transitional, normal, loose, watery, bloody
+  stoolColor String? @map("stool_color")
+  guaiacTest String? @map("guaiac_test") // positive, negative, not_done
 
   // Urine characteristics
-  urineCount    Int?      @map("urine_count") // Number of wet diapers
+  urineCount      Int?    @map("urine_count") // Number of wet diapers
+  urineColor      String? @map("urine_color") // clear, yellow, dark, bloody
   specificGravity Float?  @map("specific_gravity")
 
-  notes         String?
-  recordedBy    String?   @map("recorded_by")
-  recordedAt    DateTime  @default(now()) @map("recorded_at")
+  // Vital signs (snapshot for this hour)
+  temperature            Float? // Celsius
+  heartRate              Int?   @map("heart_rate")
+  respiratoryRate        Int?   @map("respiratory_rate")
+  bloodPressureSystolic  Int?   @map("blood_pressure_systolic")
+  bloodPressureDiastolic Int?   @map("blood_pressure_diastolic")
+  spo2                   Int?
+  fio2                   Int?
+
+  // Respiratory support
+  ventilatorMode String? @map("ventilator_mode") // CMV, SIMV, CPAP, high_flow, room_air
+  peep           Float? // cmH2O
+  pip            Float? // Peak inspiratory pressure cmH2O
+  rate           Int? // Ventilator rate
+
+  // Pain/Comfort
+  painScore     Int? @map("pain_score") // 0-10 or NIPS/FLACC score
+  sedationScore Int? @map("sedation_score")
+
+  // Activity
+  turnedRepositioned Boolean @default(false) @map("turned_repositioned")
+  skinAssessment     String? @map("skin_assessment") // intact, redness, breakdown
+
+  notes      String?
+  recordedBy String?  @map("recorded_by")
+  verifiedBy String?  @map("verified_by")
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@unique([patientId, shiftDate, hour])
   @@index([patientId, shiftDate])
+  @@index([shiftDate])
   @@map("flowsheet_entries")
 }
 
@@ -433,17 +563,17 @@ model FlowsheetEntry {
 // =====================================================
 
 model FamilyContact {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   // Contact details
-  firstName     String    @map("first_name")
-  lastName      String    @map("last_name")
-  relationship  String    // mother, father, guardian, grandparent, sibling, other
-  email         String?
-  phone         String?
-  preferredContact String @default("phone") @map("preferred_contact") // phone, email, both
+  firstName        String  @map("first_name")
+  lastName         String  @map("last_name")
+  relationship     String // mother, father, guardian, grandparent, sibling, other
+  email            String?
+  phone            String?
+  preferredContact String  @default("phone") @map("preferred_contact") // phone, email, both
 
   // Permissions
   isPrimaryContact  Boolean @default(false) @map("is_primary_contact")
@@ -451,104 +581,104 @@ model FamilyContact {
   canViewRecords    Boolean @default(false) @map("can_view_records")
 
   // Status
-  active        Boolean   @default(true)
-  verifiedAt    DateTime? @map("verified_at")
+  active     Boolean   @default(true)
+  verifiedAt DateTime? @map("verified_at")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  messages      FamilyMessage[]
+  messages          FamilyMessage[]
   educationProgress EducationProgress[]
 
   // Indexes for common queries
-  @@index([patientId])                   // Family contacts for a patient
+  @@index([patientId]) // Family contacts for a patient
   @@index([patientId, isPrimaryContact]) // Find primary contact quickly
-  @@index([email])                       // Lookup by email
+  @@index([email]) // Lookup by email
   @@map("family_contacts")
 }
 
 model FamilyMessage {
-  id            Int       @id @default(autoincrement())
-  familyContactId Int     @map("family_contact_id")
-  familyContact FamilyContact @relation(fields: [familyContactId], references: [id], onDelete: Cascade)
-  senderId      Int?      @map("sender_id")
-  sender        User?     @relation(fields: [senderId], references: [id])
+  id              Int           @id @default(autoincrement())
+  familyContactId Int           @map("family_contact_id")
+  familyContact   FamilyContact @relation(fields: [familyContactId], references: [id], onDelete: Cascade)
+  senderId        Int?          @map("sender_id")
+  sender          User?         @relation(fields: [senderId], references: [id])
 
   // Message content
-  subject       String?
-  content       String
-  messageType   String    @default("general") @map("message_type") // general, update, alert, education
+  subject     String?
+  content     String
+  messageType String  @default("general") @map("message_type") // general, update, alert, education
 
   // Delivery status
-  status        String    @default("pending") // pending, sent, delivered, read, failed
-  sentAt        DateTime? @map("sent_at")
-  deliveredAt   DateTime? @map("delivered_at")
-  readAt        DateTime? @map("read_at")
+  status      String    @default("pending") // pending, sent, delivered, read, failed
+  sentAt      DateTime? @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  readAt      DateTime? @map("read_at")
 
   // Metadata
-  channel       String    @default("app") // app, email, sms
-  isInbound     Boolean   @default(false) @map("is_inbound")
+  channel   String  @default("app") // app, email, sms
+  isInbound Boolean @default(false) @map("is_inbound")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Indexes for common queries
-  @@index([familyContactId, createdAt])  // Messages for a contact
-  @@index([senderId])                    // Messages by sender
-  @@index([status, createdAt])           // Pending messages for delivery
+  @@index([familyContactId, createdAt]) // Messages for a contact
+  @@index([senderId]) // Messages by sender
+  @@index([status, createdAt]) // Pending messages for delivery
   @@map("family_messages")
 }
 
 model EducationMaterial {
-  id            Int       @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
   // Content
-  title         String
-  description   String?
-  content       String    // Can be markdown or HTML
-  contentType   String    @default("article") @map("content_type") // article, video, checklist, faq
-  category      String    // feeding, developmental_care, discharge_prep, general_nicu, kangaroo_care, etc.
+  title       String
+  description String?
+  content     String // Can be markdown or HTML
+  contentType String  @default("article") @map("content_type") // article, video, checklist, faq
+  category    String // feeding, developmental_care, discharge_prep, general_nicu, kangaroo_care, etc.
 
   // Targeting
-  gestationalAgeMin Int?  @map("gestational_age_min") // Weeks
-  gestationalAgeMax Int?  @map("gestational_age_max")
-  dayOfLifeMin  Int?      @map("day_of_life_min")
-  dayOfLifeMax  Int?      @map("day_of_life_max")
+  gestationalAgeMin Int? @map("gestational_age_min") // Weeks
+  gestationalAgeMax Int? @map("gestational_age_max")
+  dayOfLifeMin      Int? @map("day_of_life_min")
+  dayOfLifeMax      Int? @map("day_of_life_max")
 
   // Metadata
-  estimatedMinutes Int?   @map("estimated_minutes")
-  sortOrder     Int       @default(0) @map("sort_order")
-  active        Boolean   @default(true)
+  estimatedMinutes Int?    @map("estimated_minutes")
+  sortOrder        Int     @default(0) @map("sort_order")
+  active           Boolean @default(true)
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  progress      EducationProgress[]
+  progress EducationProgress[]
 
   @@index([category])
   @@map("education_materials")
 }
 
 model EducationProgress {
-  id            Int       @id @default(autoincrement())
-  familyContactId Int     @map("family_contact_id")
-  familyContact FamilyContact @relation(fields: [familyContactId], references: [id], onDelete: Cascade)
-  materialId    Int       @map("material_id")
-  material      EducationMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  id              Int               @id @default(autoincrement())
+  familyContactId Int               @map("family_contact_id")
+  familyContact   FamilyContact     @relation(fields: [familyContactId], references: [id], onDelete: Cascade)
+  materialId      Int               @map("material_id")
+  material        EducationMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
 
   // Progress tracking
-  status        String    @default("not_started") // not_started, in_progress, completed
-  startedAt     DateTime? @map("started_at")
-  completedAt   DateTime? @map("completed_at")
-  timeSpentSeconds Int    @default(0) @map("time_spent_seconds")
+  status           String    @default("not_started") // not_started, in_progress, completed
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  timeSpentSeconds Int       @default(0) @map("time_spent_seconds")
 
   // Quiz/assessment results if applicable
-  quizScore     Float?    @map("quiz_score")
-  attempts      Int       @default(0)
+  quizScore Float? @map("quiz_score")
+  attempts  Int    @default(0)
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([familyContactId, materialId])
   @@index([familyContactId])
@@ -561,37 +691,37 @@ model EducationProgress {
 // =====================================================
 
 model Notification {
-  id            Int       @id @default(autoincrement())
-  userId        Int       @map("user_id")
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     Int  @id @default(autoincrement())
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Content
-  title         String
-  message       String
-  type          String    @default("info") // info, warning, alert, success, task
-  category      String    @default("system") // system, patient, alarm, message, task, announcement
-  priority      String    @default("normal") // low, normal, high, urgent
+  title    String
+  message  String
+  type     String @default("info") // info, warning, alert, success, task
+  category String @default("system") // system, patient, alarm, message, task, announcement
+  priority String @default("normal") // low, normal, high, urgent
 
   // Related entities (for navigation)
-  resourceType  String?   @map("resource_type") // patient, alarm, message, task
-  resourceId    Int?      @map("resource_id")
+  resourceType String? @map("resource_type") // patient, alarm, message, task
+  resourceId   Int?    @map("resource_id")
 
   // Status
-  status        String    @default("unread") // unread, read, dismissed, archived
-  readAt        DateTime? @map("read_at")
-  dismissedAt   DateTime? @map("dismissed_at")
+  status      String    @default("unread") // unread, read, dismissed, archived
+  readAt      DateTime? @map("read_at")
+  dismissedAt DateTime? @map("dismissed_at")
 
   // Scheduling
-  expiresAt     DateTime? @map("expires_at")
+  expiresAt DateTime? @map("expires_at")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Indexes for common queries
-  @@index([userId, status])              // User's notifications by status
-  @@index([userId, createdAt])           // User's notifications by time
-  @@index([userId, status, priority])    // Urgent unread notifications
-  @@index([category])                    // Filter by category
-  @@index([expiresAt])                   // Cleanup expired notifications
+  @@index([userId, status]) // User's notifications by status
+  @@index([userId, createdAt]) // User's notifications by time
+  @@index([userId, status, priority]) // Urgent unread notifications
+  @@index([category]) // Filter by category
+  @@index([expiresAt]) // Cleanup expired notifications
   @@map("notifications")
 }
 
@@ -599,59 +729,171 @@ model Notification {
 // MEDICAL ORDERS
 // =====================================================
 
-model Order {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  orderingId    Int       @map("ordering_id")
-  ordering      User      @relation("OrderingUser", fields: [orderingId], references: [id])
+enum OrderCategory {
+  MEDICATION
+  LAB
+  IMAGING
+  DIET
+  NURSING
+  RESPIRATORY
+  PROCEDURE
+  CONSULTATION
+  THERAPY
+  EQUIPMENT
+}
 
-  // Order details
-  category      String    // medication, lab, imaging, diet, nursing, respiratory, procedure
-  orderType     String    @map("order_type") // one_time, recurring, prn, continuous
-  priority      String    @default("routine") // stat, urgent, routine, scheduled
-  orderSetId    Int?      @map("order_set_id")
-  orderSet      OrderSet? @relation(fields: [orderSetId], references: [id])
+enum OrderType {
+  ONE_TIME
+  RECURRING
+  PRN
+  CONTINUOUS
+  STANDING
+}
+
+enum OrderPriority {
+  STAT
+  URGENT
+  ROUTINE
+  SCHEDULED
+  PRN
+}
+
+enum OrderStatus {
+  PENDING
+  VERIFIED
+  ACTIVE
+  IN_PROGRESS
+  COMPLETED
+  DISCONTINUED
+  CANCELLED
+  EXPIRED
+  ON_HOLD
+}
+
+model Order {
+  id         Int     @id @default(autoincrement())
+  patientId  Int     @map("patient_id")
+  patient    Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  orderingId Int     @map("ordering_id")
+  ordering   User    @relation("OrderingUser", fields: [orderingId], references: [id])
+
+  // Order classification
+  category   OrderCategory
+  orderType  OrderType     @map("order_type")
+  priority   OrderPriority @default(ROUTINE)
+  orderSetId Int?          @map("order_set_id")
+  orderSet   OrderSet?     @relation(fields: [orderSetId], references: [id])
 
   // Order content
-  name          String    // Order name/description
-  details       String?   // JSON with order-specific details (dose, route, frequency, etc.)
-  instructions  String?   // Additional instructions
+  name         String // Order name/description
+  details      String? // JSON with order-specific details (dose, route, frequency, etc.)
+  instructions String? // Additional instructions
+  indication   String? // Clinical indication for order
+
+  // Medication-specific fields (stored in details JSON, but indexed separately)
+  medication String? // Medication name
+  dose       String? // Dose with units
+  route      String? // PO, IV, IM, SC, etc.
+  frequency  String? // BID, TID, QID, Q4H, etc.
+
+  // Lab/Imaging specific
+  specimenType String? @map("specimen_type") // blood, urine, csf, etc.
+  studyType    String? @map("study_type") // xray, ultrasound, mri, ct, etc.
 
   // Status tracking
-  status        String    @default("pending") // pending, active, completed, discontinued, cancelled
-  startTime     DateTime? @map("start_time")
-  endTime       DateTime? @map("end_time")
-  discontinuedAt DateTime? @map("discontinued_at")
-  discontinuedById Int?    @map("discontinued_by_id")
-  discontinuedBy User?    @relation("DiscontinuedByUser", fields: [discontinuedById], references: [id])
-  discontinueReason String? @map("discontinue_reason")
+  status        OrderStatus @default(PENDING)
+  startTime     DateTime?   @map("start_time")
+  endTime       DateTime?   @map("end_time")
+  scheduledTime DateTime?   @map("scheduled_time")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  // Verification (co-signature for high-risk orders)
+  verifiedAt   DateTime? @map("verified_at")
+  verifiedById Int?      @map("verified_by_id")
+
+  // Completion tracking
+  completedAt   DateTime? @map("completed_at")
+  completedById Int?      @map("completed_by_id")
+
+  // Discontinuation
+  discontinuedAt    DateTime? @map("discontinued_at")
+  discontinuedById  Int?      @map("discontinued_by_id")
+  discontinuedBy    User?     @relation("DiscontinuedByUser", fields: [discontinuedById], references: [id])
+  discontinueReason String?   @map("discontinue_reason")
+
+  // Clinical decision support
+  criticalAlert    String? @map("critical_alert") // Drug interactions, allergies, etc.
+  requiresApproval Boolean @default(false) @map("requires_approval")
+
+  // Audit
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by") // User initials
+
+  // Relations
+  results OrderResult[]
 
   // Indexes for common queries
-  @@index([patientId, status])          // Patient's orders by status
-  @@index([patientId, category])        // Patient's orders by category
+  @@index([patientId, status]) // Patient's orders by status
+  @@index([patientId, category]) // Patient's orders by category
   @@index([patientId, status, category]) // Composite for filtered queries
-  @@index([orderingId, createdAt])      // "My orders" view
-  @@index([status, priority])           // Filter by status and priority
-  @@index([createdAt])                  // Sort by creation date
+  @@index([orderingId, createdAt]) // "My orders" view
+  @@index([status, priority]) // Filter by status and priority
+  @@index([status, scheduledTime]) // Scheduled orders
+  @@index([createdAt]) // Sort by creation date
   @@map("orders")
 }
 
+model OrderResult {
+  id      Int   @id @default(autoincrement())
+  orderId Int   @map("order_id")
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Result data
+  resultType     String  @map("result_type") // lab_value, image_report, procedure_note
+  value          String? // Numeric or text value
+  unit           String? // mg/dL, mmol/L, etc.
+  referenceRange String? @map("reference_range")
+  interpretation String? // normal, abnormal, critical
+
+  // For lab results
+  testName String? @map("test_name")
+  specimen String?
+
+  // For imaging/procedures
+  findings   String? // Text findings or report
+  impression String? // Clinical impression
+
+  // Metadata
+  resultedAt   DateTime? @map("resulted_at")
+  resultedBy   String?   @map("resulted_by")
+  reviewedAt   DateTime? @map("reviewed_at")
+  reviewedById Int?      @map("reviewed_by_id")
+
+  // Flags
+  isCritical Boolean @default(false) @map("is_critical")
+  isAbnormal Boolean @default(false) @map("is_abnormal")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([resultedAt])
+  @@index([isCritical, reviewedAt])
+  @@map("order_results")
+}
+
 model OrderSet {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   name        String
   description String?
-  category    String    // admission, respiratory, nutrition, infection, discharge
-  items       String    // JSON array of order templates
-  active      Boolean   @default(true)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  category    String // admission, respiratory, nutrition, infection, discharge
+  items       String // JSON array of order templates
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  orders      Order[]
+  orders Order[]
 
   @@map("order_sets")
 }
@@ -660,63 +902,130 @@ model OrderSet {
 // CARE PLANS
 // =====================================================
 
+enum CarePlanCategory {
+  RESPIRATORY
+  NUTRITION
+  NEUROLOGICAL
+  INFECTION
+  GROWTH_DEVELOPMENT
+  SKIN_WOUND
+  FAMILY_SUPPORT
+  PAIN_MANAGEMENT
+  DEVELOPMENTAL
+  DISCHARGE_PLANNING
+  OTHER
+}
+
+enum CarePlanStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  DISCONTINUED
+  ARCHIVED
+}
+
+enum CarePlanPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum CarePlanItemType {
+  TASK
+  ASSESSMENT
+  INTERVENTION
+  EDUCATION
+  MONITORING
+  CONSULTATION
+}
+
+enum CarePlanItemStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  DEFERRED
+}
+
 model CarePlan {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  createdById   Int       @map("created_by_id")
-  createdBy     User      @relation("CarePlanCreatedBy", fields: [createdById], references: [id])
+  id          Int     @id @default(autoincrement())
+  patientId   Int     @map("patient_id")
+  patient     Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdById Int     @map("created_by_id")
+  createdBy   User    @relation("CarePlanCreatedBy", fields: [createdById], references: [id])
 
   // Plan details
-  title         String
-  category      String    // respiratory, nutrition, neuro, infection, growth, skin, family
-  description   String?
-  goals         String?   // JSON array of care goals
-  priority      String    @default("medium") // high, medium, low
+  title       String
+  category    CarePlanCategory
+  description String?
+  goals       String? // JSON array of care goals
+  priority    CarePlanPriority @default(MEDIUM)
+
+  // Protocol/template reference
+  protocolId   String? @map("protocol_id") // Reference to standard protocol template
+  protocolName String? @map("protocol_name")
+
+  // Phase tracking (for multi-phase protocols)
+  currentPhase Int @default(1) @map("current_phase")
+  totalPhases  Int @default(1) @map("total_phases")
 
   // Status
-  status        String    @default("active") // active, on_hold, completed, discontinued
-  startDate     DateTime  @default(now()) @map("start_date")
-  targetDate    DateTime? @map("target_date")
-  completedAt   DateTime? @map("completed_at")
+  status      CarePlanStatus @default(ACTIVE)
+  startDate   DateTime       @default(now()) @map("start_date")
+  targetDate  DateTime?      @map("target_date")
+  completedAt DateTime?      @map("completed_at")
+  reviewDate  DateTime?      @map("review_date") // Next review date
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  // Progress tracking
+  progressPercent Float? @map("progress_percent") // 0-100
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  items         CarePlanItem[]
+  items CarePlanItem[]
 
   // Indexes for common queries
-  @@index([patientId, status])          // Patient's care plans by status
-  @@index([category])                   // Filter by category
-  @@index([createdById, createdAt])     // "My care plans" view
-  @@index([priority, status])           // Priority-based filtering
+  @@index([patientId, status]) // Patient's care plans by status
+  @@index([category]) // Filter by category
+  @@index([createdById, createdAt]) // "My care plans" view
+  @@index([priority, status]) // Priority-based filtering
+  @@index([reviewDate]) // Care plans due for review
   @@map("care_plans")
 }
 
 model CarePlanItem {
-  id          Int       @id @default(autoincrement())
-  carePlanId  Int       @map("care_plan_id")
-  carePlan    CarePlan  @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  carePlanId Int      @map("care_plan_id")
+  carePlan   CarePlan @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
 
   // Item details
   description String
-  itemType    String    @default("task") @map("item_type") // task, assessment, intervention, education
-  frequency   String?   // once, daily, weekly, prn
-  dueDate     DateTime? @map("due_date")
+  itemType    CarePlanItemType @default(TASK) @map("item_type")
+  frequency   String? // once, daily, weekly, prn, q4h, q6h
+  dueDate     DateTime?        @map("due_date")
+  orderIndex  Int              @default(0) @map("order_index")
+
+  // Assigned to
+  assignedToId Int? @map("assigned_to_id")
 
   // Status
-  status      String    @default("pending") // pending, in_progress, completed, skipped
-  completedAt DateTime? @map("completed_at")
-  completedById Int?    @map("completed_by_id")
-  notes       String?
+  status        CarePlanItemStatus @default(PENDING)
+  completedAt   DateTime?          @map("completed_at")
+  completedById Int?               @map("completed_by_id")
+  notes         String?
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  // Outcome tracking
+  outcome  String? // success, partial, failed, deferred
+  evidence String? // Documentation of completion
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Indexes for common queries
-  @@index([carePlanId, status])         // Care plan items by status
-  @@index([dueDate, status])            // Due items (for reminders)
+  @@index([carePlanId, status]) // Care plan items by status
+  @@index([dueDate, status]) // Due items (for reminders)
+  @@index([assignedToId, status]) // Assigned items
   @@map("care_plan_items")
 }
 
@@ -724,38 +1033,104 @@ model CarePlanItem {
 // DISCHARGE PLANNING
 // =====================================================
 
+enum DischargeDisposition {
+  HOME
+  HOME_WITH_SERVICES
+  TRANSFER_HOSPITAL
+  TRANSFER_FACILITY
+  HOSPICE
+  DECEASED
+  AGAINST_MEDICAL_ADVICE
+  OTHER
+}
+
+enum DischargeStatus {
+  PLANNING
+  IN_PROGRESS
+  READY
+  PENDING_APPROVAL
+  APPROVED
+  DISCHARGED
+  CANCELLED
+}
+
+enum DischargeChecklistCategory {
+  MEDICAL_STABILITY // AAP: Physiologic maturity
+  FEEDING_NUTRITION // AAP: Feeding competency
+  FAMILY_EDUCATION // AAP: Parent education
+  FOLLOW_UP // AAP: Follow-up care arranged
+  EQUIPMENT_DME // AAP: Durable medical equipment
+  MEDICATIONS // AAP: Medications reviewed
+  CAR_SEAT_SAFETY // AAP: Car seat testing
+  HEARING_SCREENING // AAP: Hearing screening
+  IMMUNIZATIONS // AAP: Immunizations
+  DOCUMENTATION // Medical records
+  SOCIAL_SERVICES // Social work assessment
+  OTHER
+}
+
+enum DischargeChecklistStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  NOT_APPLICABLE
+  DEFERRED
+}
+
 model DischargePlan {
-  id                Int       @id @default(autoincrement())
-  patientId         Int       @unique @map("patient_id")
-  patient           Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  createdById       Int       @map("created_by_id")
-  createdBy         User      @relation("DischargePlanCreatedBy", fields: [createdById], references: [id])
+  id          Int     @id @default(autoincrement())
+  patientId   Int     @unique @map("patient_id")
+  patient     Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdById Int     @map("created_by_id")
+  createdBy   User    @relation("DischargePlanCreatedBy", fields: [createdById], references: [id])
 
   // Discharge planning
-  estimatedDate     DateTime? @map("estimated_date")
-  actualDate        DateTime? @map("actual_date")
-  disposition       String?   // home, transfer, hospice, deceased
-  primaryCaregiver  String?   @map("primary_caregiver")
-  caregiverPhone    String?   @map("caregiver_phone")
+  estimatedDate    DateTime?             @map("estimated_date")
+  actualDate       DateTime?             @map("actual_date")
+  disposition      DischargeDisposition?
+  primaryCaregiver String?               @map("primary_caregiver")
+  caregiverPhone   String?               @map("caregiver_phone")
+  caregiverEmail   String?               @map("caregiver_email")
+
+  // Home readiness assessment
+  homeEnvironment    String? @map("home_environment") // safe, needs_assessment, unsafe
+  transportationPlan String? @map("transportation_plan")
+
+  // Medical equipment needs
+  equipmentNeeds String? @map("equipment_needs") // JSON array of equipment
 
   // Status
-  status            String    @default("planning") // planning, ready, pending_approval, discharged, cancelled
-  readinessScore    Int?      @map("readiness_score") // 0-100
+  status         DischargeStatus @default(PLANNING)
+  readinessScore Int?            @map("readiness_score") // 0-100
 
-  // Notes
-  specialInstructions String? @map("special_instructions")
-  followUpPlan      String?   @map("follow_up_plan")
+  // AAP Discharge Criteria tracking
+  physiologicStable Boolean @default(false) @map("physiologic_stable")
+  feedingCompetent  Boolean @default(false) @map("feeding_competent")
+  familyEducated    Boolean @default(false) @map("family_educated")
+  followUpArranged  Boolean @default(false) @map("follow_up_arranged")
+  carSeatTested     Boolean @default(false) @map("car_seat_tested")
+  hearingScreened   Boolean @default(false) @map("hearing_screened")
 
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  // Discharge instructions
+  specialInstructions   String? @map("special_instructions")
+  followUpPlan          String? @map("follow_up_plan")
+  medicationsPrescribed String? @map("medications_prescribed") // JSON array
+  dischargeInstructions String? @map("discharge_instructions")
+
+  // Approval workflow
+  approvedById Int?      @map("approved_by_id")
+  approvedAt   DateTime? @map("approved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  checklistItems    DischargeChecklistItem[]
+  checklistItems DischargeChecklistItem[]
 
   // Indexes for common queries
-  @@index([status])                      // Filter by discharge status
-  @@index([estimatedDate])               // Upcoming discharges
-  @@index([status, estimatedDate])       // Ready patients by date
+  @@index([status]) // Filter by discharge status
+  @@index([estimatedDate]) // Upcoming discharges
+  @@index([status, estimatedDate]) // Ready patients by date
   @@map("discharge_plans")
 }
 
@@ -765,22 +1140,36 @@ model DischargeChecklistItem {
   dischargePlan   DischargePlan @relation(fields: [dischargePlanId], references: [id], onDelete: Cascade)
 
   // Checklist item details
-  category        String        // medical, equipment, education, followup, documentation, safety
-  description     String
-  required        Boolean       @default(true)
-  orderIndex      Int           @default(0) @map("order_index")
+  category    DischargeChecklistCategory
+  description String
+  required    Boolean                    @default(true)
+  orderIndex  Int                        @default(0) @map("order_index")
+
+  // AAP standard reference (if applicable)
+  aapStandard  String? @map("aap_standard")
+  aapCriterion String? @map("aap_criterion")
 
   // Status
-  status          String        @default("pending") // pending, in_progress, completed, not_applicable
-  completedAt     DateTime?     @map("completed_at")
-  completedById   Int?          @map("completed_by_id")
-  notes           String?
+  status        DischargeChecklistStatus @default(PENDING)
+  completedAt   DateTime?                @map("completed_at")
+  completedById Int?                     @map("completed_by_id")
+  completedBy   String?                  @map("completed_by") // User name/initials
+  notes         String?
 
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  // Verification (for critical items)
+  verifiedAt   DateTime? @map("verified_at")
+  verifiedById Int?      @map("verified_by_id")
+
+  // Due date tracking
+  dueDate DateTime? @map("due_date")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([dischargePlanId, status])
   @@index([category])
+  @@index([required, status])
+  @@index([dueDate])
   @@map("discharge_checklist_items")
 }
 
@@ -788,43 +1177,130 @@ model DischargeChecklistItem {
 // SHIFT HANDOFF
 // =====================================================
 
+enum Shift {
+  DAY
+  EVENING
+  NIGHT
+}
+
+enum HandoffStatus {
+  DRAFT
+  SUBMITTED
+  ACKNOWLEDGED
+  ARCHIVED
+}
+
+enum PatientAcuity {
+  STABLE
+  MODERATE
+  CRITICAL
+  UNSTABLE
+}
+
 model HandoffNote {
-  id            Int       @id @default(autoincrement())
-  patientId     Int       @map("patient_id")
-  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  authorId      Int       @map("author_id")
-  author        User      @relation("HandoffAuthor", fields: [authorId], references: [id])
+  id        Int     @id @default(autoincrement())
+  patientId Int     @map("patient_id")
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  authorId  Int     @map("author_id")
+  author    User    @relation("HandoffAuthor", fields: [authorId], references: [id])
 
   // Shift information
-  shift         String    // day, evening, night
-  shiftDate     DateTime  @map("shift_date")
+  shift     Shift
+  shiftDate DateTime @map("shift_date")
 
   // SBAR format content (Situation, Background, Assessment, Recommendation)
-  situation     String?   // Current patient status/concerns
-  background    String?   // Relevant history/context
-  assessment    String?   // Clinical assessment
-  recommendation String?  // Recommendations for incoming shift
+  situation      String? // Current patient status/concerns
+  background     String? // Relevant history/context
+  assessment     String? // Clinical assessment
+  recommendation String? // Recommendations for incoming shift
 
   // Additional details
-  acuity        String?   // stable, moderate, critical
-  keyEvents     String?   @map("key_events") // JSON array of key events during shift
-  pendingTasks  String?   @map("pending_tasks") // JSON array of pending tasks
-  alertsFlags   String?   @map("alerts_flags") // JSON array of alerts/flags to monitor
+  acuity       PatientAcuity?
+  keyEvents    String?        @map("key_events") // JSON array of key events during shift
+  pendingTasks String?        @map("pending_tasks") // JSON array of pending tasks
+  alertsFlags  String?        @map("alerts_flags") // JSON array of alerts/flags to monitor
+
+  // Critical information
+  codeStatus String? @map("code_status") // Full code, DNR, etc.
+  isolation  String? // Contact, droplet, airborne, none
+  allergies  String? // Known allergies
 
   // Handoff status
-  status        String    @default("draft") // draft, submitted, acknowledged
-  acknowledgedAt DateTime? @map("acknowledged_at")
-  acknowledgedById Int?   @map("acknowledged_by_id")
-  acknowledgedBy User?    @relation("HandoffAcknowledger", fields: [acknowledgedById], references: [id])
+  status            HandoffStatus @default(DRAFT)
+  acknowledgedAt    DateTime?     @map("acknowledged_at")
+  acknowledgedById  Int?          @map("acknowledged_by_id")
+  acknowledgedBy    User?         @relation("HandoffAcknowledger", fields: [acknowledgedById], references: [id])
+  acknowledgedNotes String?       @map("acknowledged_notes")
 
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Indexes for common queries
-  @@index([patientId, shiftDate])        // Patient handoffs by shift date
-  @@index([shift, shiftDate])            // All handoffs for a shift
-  @@index([authorId, createdAt])         // Author's handoff notes
-  @@index([status])                      // Filter by handoff status
-  @@index([shiftDate, status])           // Pending handoffs for a date
+  @@index([patientId, shiftDate]) // Patient handoffs by shift date
+  @@index([shift, shiftDate]) // All handoffs for a shift
+  @@index([authorId, createdAt]) // Author's handoff notes
+  @@index([status]) // Filter by handoff status
+  @@index([shiftDate, status]) // Pending handoffs for a date
+  @@index([acuity, status]) // Critical patients
   @@map("handoff_notes")
+}
+
+// =====================================================
+// PATIENT MILESTONES
+// =====================================================
+
+enum MilestoneType {
+  FIRST_BREATH
+  EXTUBATION
+  OFF_OXYGEN
+  FIRST_ORAL_FEED
+  FULL_ORAL_FEEDS
+  REACHED_BIRTH_WEIGHT
+  DOUBLED_BIRTH_WEIGHT
+  FIRST_BATH
+  ROOM_AIR
+  DIRECT_BREASTFEED
+  KANGAROO_CARE
+  MOVED_TO_CRIB
+  EYES_OPEN
+  DEVELOPMENTAL
+  CUSTOM
+  OTHER
+}
+
+model Milestone {
+  id          Int     @id @default(autoincrement())
+  patientId   Int     @map("patient_id")
+  patient     Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdById Int     @map("created_by_id")
+  createdBy   User    @relation("MilestoneCreatedBy", fields: [createdById], references: [id])
+
+  // Milestone details
+  event         String
+  milestoneType MilestoneType @default(CUSTOM) @map("milestone_type")
+  date          DateTime
+  dayOfLife     Int?          @map("day_of_life") // DOL when milestone occurred
+  correctedAge  String?       @map("corrected_age") // Gestational age when milestone occurred
+
+  // Sharing with family
+  shared     Boolean   @default(false) // Whether shared with family
+  sharedAt   DateTime? @map("shared_at")
+  sharedById Int?      @map("shared_by_id")
+
+  // Documentation
+  notes         String?
+  photoAttached Boolean @default(false) @map("photo_attached")
+  photoPath     String? @map("photo_path")
+
+  // Significance
+  isSignificant Boolean @default(true) @map("is_significant") // Major vs minor milestone
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([patientId, date])
+  @@index([patientId, shared])
+  @@index([milestoneType])
+  @@index([isSignificant, date])
+  @@map("milestones")
 }
