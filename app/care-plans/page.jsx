@@ -17,25 +17,25 @@ import { useToast } from '@/components/Toast';
  * - PUT /api/care-plans/{patientId}/{id}/task/{taskId} - Update task status
  */
 
-// Status enums
+// Status enums (uppercase to match Prisma enums)
 const CARE_PLAN_STATUS = {
-  ACTIVE: 'active',
-  ON_HOLD: 'on_hold',
-  COMPLETED: 'completed',
-  DISCONTINUED: 'discontinued',
+  ACTIVE: 'ACTIVE',
+  ON_HOLD: 'ON_HOLD',
+  COMPLETED: 'COMPLETED',
+  DISCONTINUED: 'DISCONTINUED',
 };
 
 const TASK_STATUS = {
-  PENDING: 'pending',
-  IN_PROGRESS: 'in_progress',
-  COMPLETED: 'completed',
-  SKIPPED: 'skipped',
+  PENDING: 'PENDING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  SKIPPED: 'SKIPPED',
 };
 
 const PRIORITY = {
-  HIGH: 'high',
-  MEDIUM: 'medium',
-  LOW: 'low',
+  HIGH: 'HIGH',
+  MEDIUM: 'MEDIUM',
+  LOW: 'LOW',
 };
 
 export default function CarePlansPage() {
