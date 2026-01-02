@@ -18,7 +18,9 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  const handoffId = parseInt(params.id);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const handoffId = parseInt(resolvedParams.id);
   if (isNaN(handoffId)) {
     throw new ValidationError([{ field: 'id', message: 'Invalid handoff ID' }]);
   }
@@ -59,14 +61,14 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   }
 
   // Validate status transition
-  if (existingNote.status === 'acknowledged') {
+  if (existingNote.status === 'ACKNOWLEDGED') {
     throw new ValidationError([{
       field: 'status',
       message: 'Handoff has already been acknowledged'
     }]);
   }
 
-  if (existingNote.status === 'draft') {
+  if (existingNote.status === 'DRAFT') {
     throw new ValidationError([{
       field: 'status',
       message: 'Cannot acknowledge a draft handoff. It must be submitted first.'
@@ -85,7 +87,7 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   const updatedNote = await prisma.handoffNote.update({
     where: { id: handoffId },
     data: {
-      status: 'acknowledged',
+      status: 'ACKNOWLEDGED',
       acknowledgedAt: new Date(),
       acknowledgedById: parseInt(session.user.id),
     },

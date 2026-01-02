@@ -6,12 +6,56 @@ import { withErrorHandler, ValidationError, NotFoundError } from '@/lib/errors';
 import logger, { createTimer } from '@/lib/logger';
 import { rateLimit, getClientIP, sanitizeInput, requireAuth, requireRole } from '@/lib/security';
 
-// Helper to determine current shift based on time
+// Helper to determine current shift based on time (returns uppercase Prisma enum)
 function getCurrentShift(date = new Date()) {
   const hours = date.getHours();
-  if (hours >= 7 && hours < 15) return 'day';
-  if (hours >= 15 && hours < 23) return 'evening';
-  return 'night';
+  if (hours >= 7 && hours < 15) return 'DAY';
+  if (hours >= 15 && hours < 23) return 'EVENING';
+  return 'NIGHT';
+}
+
+// Map lowercase shift input to uppercase Prisma enum
+function mapShiftToEnum(shift) {
+  const shiftMap = {
+    day: 'DAY',
+    evening: 'EVENING',
+    night: 'NIGHT',
+    DAY: 'DAY',
+    EVENING: 'EVENING',
+    NIGHT: 'NIGHT',
+  };
+  return shiftMap[shift] || shift?.toUpperCase();
+}
+
+// Map lowercase status input to uppercase Prisma enum
+function mapStatusToEnum(status) {
+  const statusMap = {
+    draft: 'DRAFT',
+    submitted: 'SUBMITTED',
+    acknowledged: 'ACKNOWLEDGED',
+    archived: 'ARCHIVED',
+    DRAFT: 'DRAFT',
+    SUBMITTED: 'SUBMITTED',
+    ACKNOWLEDGED: 'ACKNOWLEDGED',
+    ARCHIVED: 'ARCHIVED',
+  };
+  return statusMap[status] || status?.toUpperCase();
+}
+
+// Map lowercase acuity input to uppercase Prisma enum
+function mapAcuityToEnum(acuity) {
+  if (!acuity) return null;
+  const acuityMap = {
+    stable: 'STABLE',
+    moderate: 'MODERATE',
+    critical: 'CRITICAL',
+    unstable: 'UNSTABLE',
+    STABLE: 'STABLE',
+    MODERATE: 'MODERATE',
+    CRITICAL: 'CRITICAL',
+    UNSTABLE: 'UNSTABLE',
+  };
+  return acuityMap[acuity] || acuity?.toUpperCase();
 }
 
 // Helper to get shift start date
@@ -51,9 +95,9 @@ export const GET = withErrorHandler(async (request) => {
   }
 
   if (shift) {
-    const validShifts = ['day', 'evening', 'night'];
+    const validShifts = ['day', 'evening', 'night', 'DAY', 'EVENING', 'NIGHT'];
     if (validShifts.includes(shift)) {
-      where.shift = shift;
+      where.shift = mapShiftToEnum(shift);
     }
   }
 
@@ -71,9 +115,9 @@ export const GET = withErrorHandler(async (request) => {
   }
 
   if (status) {
-    const validStatuses = ['draft', 'submitted', 'acknowledged'];
+    const validStatuses = ['draft', 'submitted', 'acknowledged', 'DRAFT', 'SUBMITTED', 'ACKNOWLEDGED'];
     if (validStatuses.includes(status)) {
-      where.status = status;
+      where.status = mapStatusToEnum(status);
     }
   }
 
@@ -201,18 +245,23 @@ export const POST = withErrorHandler(async (request) => {
 
   const {
     patientId,
-    shift,
+    shift: inputShift,
     shiftDate,
     situation,
     background,
     assessment,
     recommendation,
-    acuity,
+    acuity: inputAcuity,
     keyEvents,
     pendingTasks,
     alertsFlags,
-    status,
+    status: inputStatus,
   } = validation.data;
+
+  // Map to uppercase Prisma enum values
+  const shift = mapShiftToEnum(inputShift);
+  const status = inputStatus ? mapStatusToEnum(inputStatus) : 'DRAFT';
+  const acuity = mapAcuityToEnum(inputAcuity);
 
   // Verify patient exists
   const patient = await prisma.patient.findUnique({
@@ -242,7 +291,7 @@ export const POST = withErrorHandler(async (request) => {
 
   if (existingNote) {
     // Update existing draft instead of creating new
-    if (existingNote.status === 'draft') {
+    if (existingNote.status === 'DRAFT') {
       const updatedNote = await prisma.handoffNote.update({
         where: { id: existingNote.id },
         data: {
@@ -254,7 +303,7 @@ export const POST = withErrorHandler(async (request) => {
           keyEvents: keyEvents ? JSON.stringify(keyEvents) : null,
           pendingTasks: pendingTasks ? JSON.stringify(pendingTasks) : null,
           alertsFlags: alertsFlags ? JSON.stringify(alertsFlags) : null,
-          status: status || 'draft',
+          status: status,
         },
         include: {
           patient: {
@@ -313,7 +362,7 @@ export const POST = withErrorHandler(async (request) => {
       keyEvents: keyEvents ? JSON.stringify(keyEvents) : null,
       pendingTasks: pendingTasks ? JSON.stringify(pendingTasks) : null,
       alertsFlags: alertsFlags ? JSON.stringify(alertsFlags) : null,
-      status: status || 'draft',
+      status: status,
     },
     include: {
       patient: {
@@ -345,7 +394,7 @@ export const POST = withErrorHandler(async (request) => {
         patientId,
         shift,
         shiftDate: shiftDateObj.toISOString(),
-        status: status || 'draft',
+        status: status,
       }),
     },
   });
@@ -406,17 +455,17 @@ export const PUT = withErrorHandler(async (request) => {
   // Handle specific actions
   if (action === 'submit') {
     // Submit the handoff note
-    if (existingNote.status !== 'draft') {
+    if (existingNote.status !== 'DRAFT') {
       throw new ValidationError([{ field: 'status', message: 'Can only submit draft notes' }]);
     }
-    updateData.status = 'submitted';
+    updateData.status = 'SUBMITTED';
     auditAction = 'submit_handoff_note';
   } else if (action === 'acknowledge') {
     // Acknowledge the handoff note
-    if (existingNote.status !== 'submitted') {
+    if (existingNote.status !== 'SUBMITTED') {
       throw new ValidationError([{ field: 'status', message: 'Can only acknowledge submitted notes' }]);
     }
-    updateData.status = 'acknowledged';
+    updateData.status = 'ACKNOWLEDGED';
     updateData.acknowledgedAt = new Date();
     updateData.acknowledgedById = parseInt(session.user.id);
     auditAction = 'acknowledge_handoff_note';
@@ -428,7 +477,7 @@ export const PUT = withErrorHandler(async (request) => {
     }
 
     // Can only update draft notes
-    if (existingNote.status !== 'draft') {
+    if (existingNote.status !== 'DRAFT') {
       throw new ValidationError([{ field: 'status', message: 'Can only update draft notes' }]);
     }
 
@@ -436,7 +485,7 @@ export const PUT = withErrorHandler(async (request) => {
     if (validation.data.background !== undefined) updateData.background = validation.data.background;
     if (validation.data.assessment !== undefined) updateData.assessment = validation.data.assessment;
     if (validation.data.recommendation !== undefined) updateData.recommendation = validation.data.recommendation;
-    if (validation.data.acuity !== undefined) updateData.acuity = validation.data.acuity;
+    if (validation.data.acuity !== undefined) updateData.acuity = mapAcuityToEnum(validation.data.acuity);
     if (validation.data.keyEvents !== undefined) {
       updateData.keyEvents = JSON.stringify(validation.data.keyEvents);
     }
@@ -446,7 +495,7 @@ export const PUT = withErrorHandler(async (request) => {
     if (validation.data.alertsFlags !== undefined) {
       updateData.alertsFlags = JSON.stringify(validation.data.alertsFlags);
     }
-    if (validation.data.status !== undefined) updateData.status = validation.data.status;
+    if (validation.data.status !== undefined) updateData.status = mapStatusToEnum(validation.data.status);
   }
 
   // Update handoff note

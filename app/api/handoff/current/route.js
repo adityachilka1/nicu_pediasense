@@ -5,12 +5,25 @@ import { withErrorHandler } from '@/lib/errors';
 import logger, { createTimer } from '@/lib/logger';
 import { rateLimit, getClientIP, requireAuth } from '@/lib/security';
 
-// Helper to determine current shift based on time
+// Helper to determine current shift based on time (returns uppercase Prisma enum)
 function getCurrentShift(date = new Date()) {
   const hours = date.getHours();
-  if (hours >= 7 && hours < 15) return 'day';
-  if (hours >= 15 && hours < 23) return 'evening';
-  return 'night';
+  if (hours >= 7 && hours < 15) return 'DAY';
+  if (hours >= 15 && hours < 23) return 'EVENING';
+  return 'NIGHT';
+}
+
+// Map lowercase shift input to uppercase Prisma enum
+function mapShiftToEnum(shift) {
+  const shiftMap = {
+    day: 'DAY',
+    evening: 'EVENING',
+    night: 'NIGHT',
+    DAY: 'DAY',
+    EVENING: 'EVENING',
+    NIGHT: 'NIGHT',
+  };
+  return shiftMap[shift] || shift?.toUpperCase();
 }
 
 // Helper to get shift start date
@@ -37,7 +50,7 @@ export const GET = withErrorHandler(async (request) => {
   const { searchParams } = new URL(request.url);
   const shiftOverride = searchParams.get('shift');
 
-  const currentShift = shiftOverride || getCurrentShift();
+  const currentShift = shiftOverride ? mapShiftToEnum(shiftOverride) : getCurrentShift();
   const currentShiftDate = getShiftDate();
 
   // Get all active patients with their latest vitals and handoff notes
