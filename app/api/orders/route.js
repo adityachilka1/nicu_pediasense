@@ -36,18 +36,34 @@ export const GET = withErrorHandler(async (request) => {
     where.patientId = parseInt(patientId);
   }
 
+  // Map status to Prisma enum
+  const statusMap = {
+    pending: 'PENDING',
+    active: 'ACTIVE',
+    completed: 'COMPLETED',
+    discontinued: 'DISCONTINUED',
+    cancelled: 'CANCELLED',
+  };
+
   if (status) {
-    const validStatuses = ['pending', 'active', 'completed', 'discontinued', 'cancelled'];
-    if (validStatuses.includes(status)) {
-      where.status = status;
-    }
+    const mappedStatus = statusMap[status.toLowerCase()] || status.toUpperCase();
+    where.status = mappedStatus;
   }
 
+  // Map category to Prisma enum
+  const categoryMap = {
+    medication: 'MEDICATION',
+    lab: 'LAB',
+    imaging: 'IMAGING',
+    diet: 'DIET',
+    nursing: 'NURSING',
+    respiratory: 'RESPIRATORY',
+    procedure: 'PROCEDURE',
+  };
+
   if (category) {
-    const validCategories = ['medication', 'lab', 'imaging', 'diet', 'nursing', 'respiratory', 'procedure'];
-    if (validCategories.includes(category)) {
-      where.category = category;
-    }
+    const mappedCategory = categoryMap[category.toLowerCase()] || category.toUpperCase();
+    where.category = mappedCategory;
   }
 
   // Fetch orders and count in parallel
@@ -117,7 +133,7 @@ export const GET = withErrorHandler(async (request) => {
   // Get order categories summary
   const categorySummary = await prisma.order.groupBy({
     by: ['category'],
-    where: patientId ? { patientId: parseInt(patientId), status: { in: ['pending', 'active'] } } : { status: { in: ['pending', 'active'] } },
+    where: patientId ? { patientId: parseInt(patientId), status: { in: ['PENDING', 'ACTIVE'] } } : { status: { in: ['PENDING', 'ACTIVE'] } },
     _count: true,
   });
 
@@ -182,6 +198,40 @@ export const POST = withErrorHandler(async (request) => {
     endTime,
   } = validation.data;
 
+  // Map lowercase values to Prisma uppercase enum values
+  const categoryMap = {
+    medication: 'MEDICATION',
+    lab: 'LAB',
+    imaging: 'IMAGING',
+    diet: 'DIET',
+    nursing: 'NURSING',
+    respiratory: 'RESPIRATORY',
+    procedure: 'PROCEDURE',
+    consultation: 'CONSULTATION',
+    therapy: 'THERAPY',
+    equipment: 'EQUIPMENT',
+  };
+
+  const orderTypeMap = {
+    one_time: 'ONE_TIME',
+    recurring: 'RECURRING',
+    prn: 'PRN',
+    continuous: 'CONTINUOUS',
+    standing: 'STANDING',
+  };
+
+  const priorityMap = {
+    stat: 'STAT',
+    urgent: 'URGENT',
+    routine: 'ROUTINE',
+    scheduled: 'SCHEDULED',
+    prn: 'PRN',
+  };
+
+  const prismaCategory = categoryMap[category] || category.toUpperCase();
+  const prismaOrderType = orderTypeMap[orderType] || orderType.toUpperCase().replace(/-/g, '_');
+  const prismaPriority = priorityMap[priority || 'routine'] || 'ROUTINE';
+
   // Verify patient exists
   const patient = await prisma.patient.findUnique({
     where: { id: patientId },
@@ -205,14 +255,14 @@ export const POST = withErrorHandler(async (request) => {
     data: {
       patientId,
       orderingId: parseInt(session.user.id),
-      category,
-      orderType,
-      priority: priority || 'routine',
+      category: prismaCategory,
+      orderType: prismaOrderType,
+      priority: prismaPriority,
       orderSetId,
       name,
       details: details ? JSON.stringify(details) : null,
       instructions,
-      status: 'pending',
+      status: 'PENDING',
       startTime: startTime ? new Date(startTime) : null,
       endTime: endTime ? new Date(endTime) : null,
     },
