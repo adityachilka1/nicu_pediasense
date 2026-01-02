@@ -8,6 +8,34 @@ import { rateLimit, getClientIP, sanitizeInput, requireAuth, requireRole, ROLE_G
 import { parsePaginationParams, createPaginatedResponse } from '@/lib/pagination';
 import { createAuditLog } from '@/lib/audit';
 
+// Map lowercase milestone types to Prisma MilestoneType enum values
+function mapMilestoneTypeToEnum(milestoneType) {
+  const typeMap = {
+    'first_breath': 'FIRST_BREATH',
+    'off_oxygen': 'OFF_OXYGEN',
+    'first_feed': 'FIRST_ORAL_FEED',
+    'first_bottle': 'FIRST_ORAL_FEED',
+    'first_breastfeed': 'DIRECT_BREASTFEED',
+    'kangaroo_care': 'KANGAROO_CARE',
+    'weight_gain': 'REACHED_BIRTH_WEIGHT',
+    'phototherapy_complete': 'OTHER',
+    'extubation': 'EXTUBATION',
+    'discharge_ready': 'OTHER',
+    'custom': 'CUSTOM',
+    // Also accept uppercase values
+    'FIRST_BREATH': 'FIRST_BREATH',
+    'OFF_OXYGEN': 'OFF_OXYGEN',
+    'FIRST_ORAL_FEED': 'FIRST_ORAL_FEED',
+    'DIRECT_BREASTFEED': 'DIRECT_BREASTFEED',
+    'KANGAROO_CARE': 'KANGAROO_CARE',
+    'REACHED_BIRTH_WEIGHT': 'REACHED_BIRTH_WEIGHT',
+    'EXTUBATION': 'EXTUBATION',
+    'CUSTOM': 'CUSTOM',
+    'OTHER': 'OTHER',
+  };
+  return typeMap[milestoneType] || 'CUSTOM';
+}
+
 // GET /api/family/milestones/[patientId] - Get milestones for a patient
 export const GET = withErrorHandler(async (request, { params }) => {
   const timer = createTimer();
@@ -18,7 +46,9 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'api');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -130,7 +160,9 @@ export const POST = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -156,13 +188,16 @@ export const POST = withErrorHandler(async (request, { params }) => {
     throw new NotFoundError('Patient');
   }
 
+  // Map milestone type to Prisma enum value
+  const mappedMilestoneType = mapMilestoneTypeToEnum(milestoneType);
+
   // Create milestone
   const milestone = await prisma.milestone.create({
     data: {
       patientId,
       createdById: parseInt(session.user.id),
       event,
-      milestoneType,
+      milestoneType: mappedMilestoneType,
       date: new Date(date),
       shared,
       notes,
@@ -215,7 +250,9 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }

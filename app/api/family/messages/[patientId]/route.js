@@ -18,7 +18,9 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'api');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -174,7 +176,9 @@ export const POST = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
