@@ -5,6 +5,23 @@ import { withErrorHandler, ValidationError, NotFoundError } from '@/lib/errors';
 import logger, { createTimer } from '@/lib/logger';
 import { rateLimit, getClientIP, requireAuth } from '@/lib/security';
 
+// Map lowercase status input to uppercase Prisma enum
+function mapChecklistStatusToEnum(status) {
+  const statusMap = {
+    pending: 'PENDING',
+    in_progress: 'IN_PROGRESS',
+    completed: 'COMPLETED',
+    not_applicable: 'NOT_APPLICABLE',
+    deferred: 'DEFERRED',
+    PENDING: 'PENDING',
+    IN_PROGRESS: 'IN_PROGRESS',
+    COMPLETED: 'COMPLETED',
+    NOT_APPLICABLE: 'NOT_APPLICABLE',
+    DEFERRED: 'DEFERRED',
+  };
+  return statusMap[status] || status?.toUpperCase();
+}
+
 // GET /api/discharge/[patientId]/readiness - Calculate discharge readiness
 export const GET = withErrorHandler(async (request, { params }) => {
   const timer = createTimer();
@@ -15,7 +32,9 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'api');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -68,10 +87,10 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const { checklistItems } = dischargePlan;
 
   // Calculate overall readiness
-  const applicableItems = checklistItems.filter(item => item.status !== 'not_applicable');
+  const applicableItems = checklistItems.filter(item => item.status !== 'NOT_APPLICABLE');
   const requiredItems = applicableItems.filter(item => item.required);
-  const completedRequired = requiredItems.filter(item => item.status === 'completed');
-  const completedAll = applicableItems.filter(item => item.status === 'completed');
+  const completedRequired = requiredItems.filter(item => item.status === 'COMPLETED');
+  const completedAll = applicableItems.filter(item => item.status === 'COMPLETED');
 
   const readinessScore = requiredItems.length > 0
     ? Math.round((completedRequired.length / requiredItems.length) * 100)
@@ -104,25 +123,25 @@ export const GET = withErrorHandler(async (request, { params }) => {
       completedAt: item.completedAt,
     });
 
-    if (item.status === 'not_applicable') {
+    if (item.status === 'NOT_APPLICABLE') {
       cat.notApplicable++;
     } else {
       cat.applicable++;
       if (item.required) {
         cat.required++;
-        if (item.status === 'completed') {
+        if (item.status === 'COMPLETED') {
           cat.requiredCompleted++;
         }
       }
 
       switch (item.status) {
-        case 'completed':
+        case 'COMPLETED':
           cat.completed++;
           break;
-        case 'in_progress':
+        case 'IN_PROGRESS':
           cat.inProgress++;
           break;
-        case 'pending':
+        case 'PENDING':
           cat.pending++;
           break;
       }
@@ -138,7 +157,7 @@ export const GET = withErrorHandler(async (request, { params }) => {
 
   // Identify blockers (required items not completed)
   const blockers = checklistItems
-    .filter(item => item.required && item.status !== 'completed' && item.status !== 'not_applicable')
+    .filter(item => item.required && item.status !== 'COMPLETED' && item.status !== 'NOT_APPLICABLE')
     .map(item => ({
       id: item.id,
       category: item.category,
@@ -148,7 +167,7 @@ export const GET = withErrorHandler(async (request, { params }) => {
 
   // Identify pending items (all items not completed)
   const pendingItems = checklistItems
-    .filter(item => item.status === 'pending' || item.status === 'in_progress')
+    .filter(item => item.status === 'PENDING' || item.status === 'IN_PROGRESS')
     .map(item => ({
       id: item.id,
       category: item.category,

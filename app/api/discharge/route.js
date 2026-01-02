@@ -6,45 +6,87 @@ import { withErrorHandler, ValidationError, NotFoundError, ConflictError } from 
 import logger, { createTimer } from '@/lib/logger';
 import { rateLimit, getClientIP, sanitizeInput, requireAuth, requireRole } from '@/lib/security';
 
-// Default discharge checklist items by category
+// Map lowercase status input to uppercase Prisma enum
+function mapStatusToEnum(status) {
+  const statusMap = {
+    planning: 'PLANNING',
+    in_progress: 'IN_PROGRESS',
+    ready: 'READY',
+    pending_approval: 'PENDING_APPROVAL',
+    approved: 'APPROVED',
+    discharged: 'DISCHARGED',
+    cancelled: 'CANCELLED',
+    PLANNING: 'PLANNING',
+    IN_PROGRESS: 'IN_PROGRESS',
+    READY: 'READY',
+    PENDING_APPROVAL: 'PENDING_APPROVAL',
+    APPROVED: 'APPROVED',
+    DISCHARGED: 'DISCHARGED',
+    CANCELLED: 'CANCELLED',
+  };
+  return statusMap[status] || status?.toUpperCase();
+}
+
+// Map lowercase checklist status to uppercase Prisma enum
+function mapChecklistStatusToEnum(status) {
+  const statusMap = {
+    pending: 'PENDING',
+    in_progress: 'IN_PROGRESS',
+    completed: 'COMPLETED',
+    not_applicable: 'NOT_APPLICABLE',
+    deferred: 'DEFERRED',
+    PENDING: 'PENDING',
+    IN_PROGRESS: 'IN_PROGRESS',
+    COMPLETED: 'COMPLETED',
+    NOT_APPLICABLE: 'NOT_APPLICABLE',
+    DEFERRED: 'DEFERRED',
+  };
+  return statusMap[status] || status?.toUpperCase();
+}
+
+// Default discharge checklist items by category (using Prisma enum values)
 const DEFAULT_CHECKLIST_ITEMS = [
-  // Medical criteria
-  { category: 'medical', description: 'Stable temperature in open crib for 24+ hours', required: true, orderIndex: 0 },
-  { category: 'medical', description: 'Adequate weight gain (20-30g/day)', required: true, orderIndex: 1 },
-  { category: 'medical', description: 'No apnea/bradycardia events for 5-7 days', required: true, orderIndex: 2 },
-  { category: 'medical', description: 'Off all supplemental oxygen or stable on home O2', required: true, orderIndex: 3 },
-  { category: 'medical', description: 'Full oral feeds or stable on enteral feeds', required: true, orderIndex: 4 },
-  { category: 'medical', description: 'All medications transitioned to home formulations', required: true, orderIndex: 5 },
+  // Medical criteria (MEDICAL_STABILITY)
+  { category: 'MEDICAL_STABILITY', description: 'Stable temperature in open crib for 24+ hours', required: true, orderIndex: 0 },
+  { category: 'MEDICAL_STABILITY', description: 'Adequate weight gain (20-30g/day)', required: true, orderIndex: 1 },
+  { category: 'MEDICAL_STABILITY', description: 'No apnea/bradycardia events for 5-7 days', required: true, orderIndex: 2 },
+  { category: 'MEDICAL_STABILITY', description: 'Off all supplemental oxygen or stable on home O2', required: true, orderIndex: 3 },
 
-  // Equipment
-  { category: 'equipment', description: 'Car seat test completed (if required)', required: true, orderIndex: 0 },
-  { category: 'equipment', description: 'Home apnea monitor ordered (if needed)', required: false, orderIndex: 1 },
-  { category: 'equipment', description: 'Home oxygen equipment arranged (if needed)', required: false, orderIndex: 2 },
-  { category: 'equipment', description: 'Breast pump/feeding supplies provided', required: false, orderIndex: 3 },
+  // Feeding & Nutrition (FEEDING_NUTRITION)
+  { category: 'FEEDING_NUTRITION', description: 'Full oral feeds or stable on enteral feeds', required: true, orderIndex: 4 },
+  { category: 'FEEDING_NUTRITION', description: 'All medications transitioned to home formulations', required: true, orderIndex: 5 },
 
-  // Education
-  { category: 'education', description: 'Infant CPR training completed', required: true, orderIndex: 0 },
-  { category: 'education', description: 'Safe sleep education provided', required: true, orderIndex: 1 },
-  { category: 'education', description: 'Feeding education completed', required: true, orderIndex: 2 },
-  { category: 'education', description: 'Medication administration teaching done', required: true, orderIndex: 3 },
-  { category: 'education', description: 'Warning signs/when to call reviewed', required: true, orderIndex: 4 },
+  // Equipment/DME (EQUIPMENT_DME)
+  { category: 'EQUIPMENT_DME', description: 'Home apnea monitor ordered (if needed)', required: false, orderIndex: 1 },
+  { category: 'EQUIPMENT_DME', description: 'Home oxygen equipment arranged (if needed)', required: false, orderIndex: 2 },
+  { category: 'EQUIPMENT_DME', description: 'Breast pump/feeding supplies provided', required: false, orderIndex: 3 },
 
-  // Follow-up
-  { category: 'followup', description: 'Pediatrician appointment scheduled', required: true, orderIndex: 0 },
-  { category: 'followup', description: 'Specialty follow-up appointments scheduled', required: false, orderIndex: 1 },
-  { category: 'followup', description: 'Early intervention referral made (if needed)', required: false, orderIndex: 2 },
-  { category: 'followup', description: 'Ophthalmology follow-up scheduled (if ROP)', required: false, orderIndex: 3 },
+  // Car seat safety (CAR_SEAT_SAFETY)
+  { category: 'CAR_SEAT_SAFETY', description: 'Car seat test completed (if required)', required: true, orderIndex: 0 },
 
-  // Documentation
-  { category: 'documentation', description: 'Discharge summary completed', required: true, orderIndex: 0 },
-  { category: 'documentation', description: 'Prescriptions written', required: true, orderIndex: 1 },
-  { category: 'documentation', description: 'Immunization records provided', required: true, orderIndex: 2 },
-  { category: 'documentation', description: 'Birth certificate information verified', required: true, orderIndex: 3 },
+  // Family Education (FAMILY_EDUCATION)
+  { category: 'FAMILY_EDUCATION', description: 'Infant CPR training completed', required: true, orderIndex: 0 },
+  { category: 'FAMILY_EDUCATION', description: 'Safe sleep education provided', required: true, orderIndex: 1 },
+  { category: 'FAMILY_EDUCATION', description: 'Feeding education completed', required: true, orderIndex: 2 },
+  { category: 'FAMILY_EDUCATION', description: 'Medication administration teaching done', required: true, orderIndex: 3 },
+  { category: 'FAMILY_EDUCATION', description: 'Warning signs/when to call reviewed', required: true, orderIndex: 4 },
 
-  // Safety
-  { category: 'safety', description: 'Home safety assessment reviewed', required: true, orderIndex: 0 },
-  { category: 'safety', description: 'Smoke-free environment confirmed', required: true, orderIndex: 1 },
-  { category: 'safety', description: 'Emergency contacts verified', required: true, orderIndex: 2 },
+  // Follow-up (FOLLOW_UP)
+  { category: 'FOLLOW_UP', description: 'Pediatrician appointment scheduled', required: true, orderIndex: 0 },
+  { category: 'FOLLOW_UP', description: 'Specialty follow-up appointments scheduled', required: false, orderIndex: 1 },
+  { category: 'FOLLOW_UP', description: 'Early intervention referral made (if needed)', required: false, orderIndex: 2 },
+  { category: 'FOLLOW_UP', description: 'Ophthalmology follow-up scheduled (if ROP)', required: false, orderIndex: 3 },
+
+  // Documentation (DOCUMENTATION)
+  { category: 'DOCUMENTATION', description: 'Discharge summary completed', required: true, orderIndex: 0 },
+  { category: 'DOCUMENTATION', description: 'Prescriptions written', required: true, orderIndex: 1 },
+  { category: 'DOCUMENTATION', description: 'Immunization records provided', required: true, orderIndex: 2 },
+  { category: 'DOCUMENTATION', description: 'Birth certificate information verified', required: true, orderIndex: 3 },
+
+  // Social Services (SOCIAL_SERVICES)
+  { category: 'SOCIAL_SERVICES', description: 'Home safety assessment reviewed', required: true, orderIndex: 0 },
+  { category: 'SOCIAL_SERVICES', description: 'Smoke-free environment confirmed', required: true, orderIndex: 1 },
+  { category: 'SOCIAL_SERVICES', description: 'Emergency contacts verified', required: true, orderIndex: 2 },
 ];
 
 // GET /api/discharge - Get discharge plan and checklist for a patient
@@ -69,9 +111,10 @@ export const GET = withErrorHandler(async (request) => {
   }
 
   if (status) {
-    const validStatuses = ['planning', 'ready', 'pending_approval', 'discharged', 'cancelled'];
-    if (validStatuses.includes(status)) {
-      where.status = status;
+    const mappedStatus = mapStatusToEnum(status);
+    const validStatuses = ['PLANNING', 'IN_PROGRESS', 'READY', 'PENDING_APPROVAL', 'APPROVED', 'DISCHARGED', 'CANCELLED'];
+    if (validStatuses.includes(mappedStatus)) {
+      where.status = mappedStatus;
     }
   }
 
@@ -128,12 +171,12 @@ export const GET = withErrorHandler(async (request) => {
       byCategory[item.category].total++;
       if (item.required) byCategory[item.category].required++;
 
-      if (item.status === 'completed') {
+      if (item.status === 'COMPLETED') {
         byCategory[item.category].completed++;
         if (item.required) byCategory[item.category].requiredCompleted++;
-      } else if (item.status === 'in_progress') {
+      } else if (item.status === 'IN_PROGRESS') {
         byCategory[item.category].inProgress++;
-      } else if (item.status === 'not_applicable') {
+      } else if (item.status === 'NOT_APPLICABLE') {
         byCategory[item.category].notApplicable++;
         if (item.required) byCategory[item.category].requiredCompleted++; // N/A counts as done for required
       } else {
@@ -144,7 +187,7 @@ export const GET = withErrorHandler(async (request) => {
     // Calculate readiness score
     const requiredItems = items.filter(i => i.required);
     const completedRequired = requiredItems.filter(i =>
-      i.status === 'completed' || i.status === 'not_applicable'
+      i.status === 'COMPLETED' || i.status === 'NOT_APPLICABLE'
     ).length;
     const readinessScore = requiredItems.length > 0
       ? Math.round((completedRequired / requiredItems.length) * 100)
@@ -154,10 +197,10 @@ export const GET = withErrorHandler(async (request) => {
       ...plan,
       checklistStats: {
         total: items.length,
-        completed: items.filter(i => i.status === 'completed').length,
-        pending: items.filter(i => i.status === 'pending').length,
-        inProgress: items.filter(i => i.status === 'in_progress').length,
-        notApplicable: items.filter(i => i.status === 'not_applicable').length,
+        completed: items.filter(i => i.status === 'COMPLETED').length,
+        pending: items.filter(i => i.status === 'PENDING').length,
+        inProgress: items.filter(i => i.status === 'IN_PROGRESS').length,
+        notApplicable: items.filter(i => i.status === 'NOT_APPLICABLE').length,
         byCategory,
         readinessScore,
       },
@@ -242,7 +285,7 @@ export const POST = withErrorHandler(async (request) => {
         caregiverPhone,
         specialInstructions,
         followUpPlan,
-        status: 'planning',
+        status: 'PLANNING',
         readinessScore: 0,
       },
     });
@@ -260,7 +303,7 @@ export const POST = withErrorHandler(async (request) => {
         description: item.description,
         required: item.required ?? true,
         orderIndex: item.orderIndex ?? 0,
-        status: 'pending',
+        status: 'PENDING',
       })),
     });
 
@@ -357,13 +400,14 @@ export const PUT = withErrorHandler(async (request) => {
       throw new NotFoundError('Checklist item');
     }
 
-    // Update the item
+    // Update the item - map status to uppercase
+    const mappedStatus = mapChecklistStatusToEnum(validation.data.status);
     const updateData = {
-      status: validation.data.status,
+      status: mappedStatus,
       notes: validation.data.notes,
     };
 
-    if (validation.data.status === 'completed') {
+    if (mappedStatus === 'COMPLETED') {
       updateData.completedAt = new Date();
       updateData.completedById = parseInt(session.user.id);
     }
@@ -380,7 +424,7 @@ export const PUT = withErrorHandler(async (request) => {
 
     const requiredItems = allItems.filter(i => i.required);
     const completedRequired = requiredItems.filter(i =>
-      i.status === 'completed' || i.status === 'not_applicable'
+      i.status === 'COMPLETED' || i.status === 'NOT_APPLICABLE'
     ).length;
     const readinessScore = requiredItems.length > 0
       ? Math.round((completedRequired / requiredItems.length) * 100)
@@ -392,8 +436,8 @@ export const PUT = withErrorHandler(async (request) => {
       where: { id: existingItem.dischargePlanId },
       data: {
         readinessScore,
-        status: allRequiredComplete && existingItem.dischargePlan.status === 'planning'
-          ? 'ready'
+        status: allRequiredComplete && existingItem.dischargePlan.status === 'PLANNING'
+          ? 'READY'
           : existingItem.dischargePlan.status,
       },
     });

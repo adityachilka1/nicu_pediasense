@@ -7,6 +7,27 @@ import logger, { createTimer } from '@/lib/logger';
 import { rateLimit, getClientIP, sanitizeInput, requireAuth, requireRole, ROLE_GROUPS } from '@/lib/security';
 import { createAuditLog } from '@/lib/audit';
 
+// Map lowercase status input to uppercase Prisma enum
+function mapStatusToEnum(status) {
+  const statusMap = {
+    planning: 'PLANNING',
+    in_progress: 'IN_PROGRESS',
+    ready: 'READY',
+    pending_approval: 'PENDING_APPROVAL',
+    approved: 'APPROVED',
+    discharged: 'DISCHARGED',
+    cancelled: 'CANCELLED',
+    PLANNING: 'PLANNING',
+    IN_PROGRESS: 'IN_PROGRESS',
+    READY: 'READY',
+    PENDING_APPROVAL: 'PENDING_APPROVAL',
+    APPROVED: 'APPROVED',
+    DISCHARGED: 'DISCHARGED',
+    CANCELLED: 'CANCELLED',
+  };
+  return statusMap[status] || status?.toUpperCase();
+}
+
 // Default AAP discharge checklist items (using Prisma enum values)
 const DEFAULT_CHECKLIST_ITEMS = [
   // Physiologic stability (MEDICAL_STABILITY)
@@ -63,7 +84,9 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'api');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -109,7 +132,7 @@ export const GET = withErrorHandler(async (request, { params }) => {
       data: {
         patientId,
         createdById: parseInt(session.user.id),
-        status: 'planning',
+        status: 'PLANNING',
         checklistItems: {
           create: DEFAULT_CHECKLIST_ITEMS,
         },
@@ -209,7 +232,9 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  const patientId = parseInt(params.patientId);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const patientId = parseInt(resolvedParams.patientId);
   if (isNaN(patientId)) {
     throw new ValidationError([{ field: 'patientId', message: 'Invalid patient ID' }]);
   }
@@ -232,14 +257,20 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     throw new NotFoundError('Discharge plan');
   }
 
+  // Map status to uppercase if provided
+  const updateData = {
+    ...validation.data,
+    estimatedDate: validation.data.estimatedDate ? new Date(validation.data.estimatedDate) : undefined,
+    actualDate: validation.data.actualDate ? new Date(validation.data.actualDate) : undefined,
+  };
+  if (updateData.status) {
+    updateData.status = mapStatusToEnum(updateData.status);
+  }
+
   // Update discharge plan
   const dischargePlan = await prisma.dischargePlan.update({
     where: { patientId },
-    data: {
-      ...validation.data,
-      estimatedDate: validation.data.estimatedDate ? new Date(validation.data.estimatedDate) : undefined,
-      actualDate: validation.data.actualDate ? new Date(validation.data.actualDate) : undefined,
-    },
+    data: updateData,
     include: {
       checklistItems: {
         orderBy: { orderIndex: 'asc' },
@@ -254,8 +285,9 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     },
   });
 
-  // If status changed to 'discharged', update patient status
-  if (validation.data.status === 'discharged') {
+  // If status changed to DISCHARGED, update patient status
+  const mappedStatus = mapStatusToEnum(validation.data.status);
+  if (mappedStatus === 'DISCHARGED') {
     await prisma.patient.update({
       where: { id: patientId },
       data: {
