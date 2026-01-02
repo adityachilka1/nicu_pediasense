@@ -8,11 +8,12 @@ import {
 
 describe('ROLES', () => {
   it('should define all expected roles', () => {
-    expect(ROLES.ADMIN).toBe('Admin');
-    expect(ROLES.PHYSICIAN).toBe('Physician');
-    expect(ROLES.CHARGE_NURSE).toBe('Charge Nurse');
-    expect(ROLES.STAFF_NURSE).toBe('Staff Nurse');
-    expect(ROLES.ADMINISTRATIVE).toBe('Administrative');
+    // Role values are snake_case to match database values
+    expect(ROLES.ADMIN).toBe('admin');
+    expect(ROLES.PHYSICIAN).toBe('physician');
+    expect(ROLES.CHARGE_NURSE).toBe('charge_nurse');
+    expect(ROLES.STAFF_NURSE).toBe('staff_nurse');
+    expect(ROLES.ADMINISTRATIVE).toBe('administrative');
   });
 
   it('should have 5 roles defined', () => {
