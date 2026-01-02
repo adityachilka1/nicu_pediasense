@@ -46,8 +46,9 @@ export const GET = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'api');
 
-  // Validate entry ID
-  const entryId = parseInt(params.entryId, 10);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const entryId = parseInt(resolvedParams.entryId, 10);
   if (isNaN(entryId) || entryId <= 0) {
     throw new ValidationError([{ field: 'entryId', message: 'Entry ID must be a positive integer' }]);
   }
@@ -135,8 +136,9 @@ export const PUT = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  // Validate entry ID
-  const entryId = parseInt(params.entryId, 10);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const entryId = parseInt(resolvedParams.entryId, 10);
   if (isNaN(entryId) || entryId <= 0) {
     throw new ValidationError([{ field: 'entryId', message: 'Entry ID must be a positive integer' }]);
   }
@@ -165,7 +167,7 @@ export const PUT = withErrorHandler(async (request, { params }) => {
 
   const validationResult = updateFlowsheetSchema.safeParse(body);
   if (!validationResult.success) {
-    const errors = validationResult.error?.errors || [];
+    const errors = validationResult.error?.errors || validationResult.error?.issues || [];
     throw new ValidationError(
       errors.map(err => ({
         field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || 'unknown'),
@@ -369,8 +371,9 @@ export const DELETE = withErrorHandler(async (request, { params }) => {
   const clientIP = getClientIP(request);
   rateLimit(clientIP, 'heavy');
 
-  // Validate entry ID
-  const entryId = parseInt(params.entryId, 10);
+  // In Next.js 15, params is a Promise
+  const resolvedParams = await params;
+  const entryId = parseInt(resolvedParams.entryId, 10);
   if (isNaN(entryId) || entryId <= 0) {
     throw new ValidationError([{ field: 'entryId', message: 'Entry ID must be a positive integer' }]);
   }
