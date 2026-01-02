@@ -203,7 +203,7 @@ export const PUT = withErrorHandler(async (request, { params }) => {
       name: { contains: 'TPN' },
     },
     data: {
-      status: 'discontinued',
+      status: 'DISCONTINUED',
       discontinuedAt: new Date(),
       discontinuedById: parseInt(session.user.id),
       discontinueReason: 'Updated TPN order',
@@ -215,9 +215,9 @@ export const PUT = withErrorHandler(async (request, { params }) => {
     data: {
       patientId,
       orderingId: parseInt(session.user.id),
-      category: 'diet',
-      orderType: 'continuous',
-      priority: 'routine',
+      category: 'DIET',
+      orderType: 'CONTINUOUS',
+      priority: 'ROUTINE',
       name: `TPN D${tpnData.dextrose}% AA${tpnData.aminoAcids}g/kg @ ${tpnData.rate}mL/hr`,
       details: JSON.stringify({
         ...tpnData,
@@ -226,7 +226,7 @@ export const PUT = withErrorHandler(async (request, { params }) => {
         patientWeight: patient.currentWeight,
       }),
       instructions: tpnData.notes || 'Infuse via central line. Verify with pharmacy before administration.',
-      status: 'active',
+      status: 'ACTIVE',
       startTime: new Date(),
     },
   });

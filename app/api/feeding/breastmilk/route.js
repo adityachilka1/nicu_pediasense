@@ -196,7 +196,7 @@ async function calculateInventoryUpdate(patientId, newVolume) {
   const recentFeedings = await prisma.feedingLog.findMany({
     where: {
       patientId,
-      feedingType: { in: ['breast', 'fortified'] },
+      feedingType: { in: ['BREAST_MILK', 'FORTIFIED_BREAST_MILK', 'DONOR_MILK'] },
       recordedAt: { gte: last24h },
     },
   });

@@ -118,17 +118,42 @@ export const POST = withErrorHandler(async (request) => {
     throw new NotFoundError('Patient');
   }
 
+  // Map lowercase values to uppercase Prisma enum values
+  const feedingTypeMap = {
+    breast: 'BREAST_MILK',
+    formula: 'FORMULA',
+    fortified: 'FORTIFIED_BREAST_MILK',
+    tpn: 'TPN',
+    enteral: 'MIXED',
+  };
+  const mappedFeedingType = feedingTypeMap[data.feedingType] || data.feedingType?.toUpperCase() || 'MIXED';
+
+  const routeMap = {
+    oral: 'ORAL',
+    ng: 'NG_TUBE',
+    og: 'OG_TUBE',
+    gt: 'GT_TUBE',
+  };
+  const mappedRoute = routeMap[data.route] || data.route?.toUpperCase() || 'NG_TUBE';
+
+  const toleranceMap = {
+    good: 'GOOD',
+    fair: 'FAIR',
+    poor: 'POOR',
+  };
+  const mappedTolerance = data.tolerance ? (toleranceMap[data.tolerance] || data.tolerance?.toUpperCase()) : null;
+
   // Create the feeding log
   const feedingLog = await prisma.feedingLog.create({
     data: {
       patientId: data.patientId,
-      feedingType: data.feedingType,
-      route: data.route,
+      feedingType: mappedFeedingType,
+      route: mappedRoute,
       volumeOrdered: data.volumeOrdered,
       volumeGiven: data.volumeGiven || data.volumeOrdered,
       volumeResidual: data.volumeResidual,
       residualColor: data.residualColor,
-      tolerance: data.tolerance,
+      tolerance: mappedTolerance,
       emesis: data.emesis,
       emesisAmount: data.emesis ? data.emesisAmount : null,
       fortified: data.fortified,
