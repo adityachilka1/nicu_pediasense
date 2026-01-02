@@ -17,6 +17,8 @@ const calculators = [
   { id: 'pain', name: 'Pain Assessment', icon: '😢', description: 'NIPS & FLACC scales' },
   { id: 'abg', name: 'Blood Gas', icon: '🩸', description: 'ABG/VBG interpreter' },
   { id: 'vent', name: 'Ventilator', icon: '🌬️', description: 'Initial vent settings' },
+  { id: 'oi', name: 'Oxygenation Index', icon: '🫀', description: 'OI & A-a gradient' },
+  { id: 'nec', name: 'NEC Risk', icon: '🔬', description: 'Bell staging & risk factors' },
 ];
 
 export default function CalculatorsPage() {
@@ -68,6 +70,8 @@ export default function CalculatorsPage() {
             {activeCalc === 'pain' && <PainAssessmentCalculator />}
             {activeCalc === 'abg' && <BloodGasCalculator />}
             {activeCalc === 'vent' && <VentilatorCalculator />}
+            {activeCalc === 'oi' && <OxygenationIndexCalculator />}
+            {activeCalc === 'nec' && <NECRiskCalculator />}
           </div>
         </div>
       </div>
@@ -1115,6 +1119,14 @@ function DosingCalculator() {
     indomethacin: { name: 'Indomethacin (PDA)', loading: 0.2, maintenance: 0.1, unit: 'mg/kg', freq: 'q12-24h x3', notes: 'For PDA closure. Adjust interval based on urine output and age.' },
     ibuprofen: { name: 'Ibuprofen (PDA)', loading: 10, maintenance: 5, unit: 'mg/kg', freq: 'q24h x3', notes: 'For PDA closure. Day 1: 10mg/kg, Days 2-3: 5mg/kg each.' },
     surfactant: { name: 'Surfactant (Curosurf)', loading: 0, maintenance: 200, unit: 'mg/kg', freq: 'First dose', notes: 'Initial: 200mg/kg, Repeat: 100mg/kg if needed. Max 3 doses.' },
+    phenobarbital: { name: 'Phenobarbital', loading: 20, maintenance: 5, unit: 'mg/kg', freq: 'Once daily', notes: 'For seizures. Loading: 20mg/kg IV (can give additional 10mg/kg x2). Maintenance starts 12-24h after loading.' },
+    fentanyl: { name: 'Fentanyl', loading: 0, maintenance: 1, unit: 'mcg/kg/dose', freq: 'q2-4h PRN', notes: 'For pain/sedation. Continuous: 1-5 mcg/kg/hr. Bolus: 1-2 mcg/kg. Monitor for chest rigidity.' },
+    morphine: { name: 'Morphine', loading: 0, maintenance: 0.05, unit: 'mg/kg/dose', freq: 'q4h PRN', notes: 'For pain/sedation. Continuous: 10-20 mcg/kg/hr. Use with caution in preterm.' },
+    dopamine: { name: 'Dopamine', loading: 0, maintenance: 5, unit: 'mcg/kg/min', freq: 'Continuous', notes: 'Low dose (2-5): renal. Medium (5-10): cardiac. High (10-20): vasopressor. Central line preferred.' },
+    dobutamine: { name: 'Dobutamine', loading: 0, maintenance: 5, unit: 'mcg/kg/min', freq: 'Continuous', notes: 'For cardiac output. Range: 2.5-20 mcg/kg/min. Inotrope, minimal vasopressor effect.' },
+    epinephrine: { name: 'Epinephrine', loading: 0, maintenance: 0.1, unit: 'mcg/kg/min', freq: 'Continuous', notes: 'For refractory hypotension. Range: 0.05-1 mcg/kg/min. Central line required.' },
+    hydrocortisone: { name: 'Hydrocortisone (Stress)', loading: 0, maintenance: 1, unit: 'mg/kg/dose', freq: 'q8h', notes: 'For refractory hypotension/adrenal insufficiency. Taper over 5-7 days.' },
+    vitaminK: { name: 'Vitamin K (Prophylaxis)', loading: 0, maintenance: 1, unit: 'mg', freq: 'Once at birth', notes: 'Term: 1mg IM. Preterm <1500g: 0.5mg IM. For hemorrhagic disease prevention.' },
   };
 
   const getGentamicinInterval = (gaWeeks, pnaDays) => {
@@ -2026,6 +2038,669 @@ function VentilatorCalculator() {
             These are suggested starting parameters only. Always individualize based on clinical response,
             blood gases, and chest X-ray findings.
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Oxygenation Index & A-a Gradient Calculator
+function OxygenationIndexCalculator() {
+  const [values, setValues] = useState({
+    map: '',
+    fio2: '',
+    pao2: '',
+    paco2: '',
+    patm: '760', // Default atmospheric pressure at sea level
+  });
+  const [result, setResult] = useState(null);
+
+  const calculate = () => {
+    const map = parseFloat(values.map);
+    const fio2 = parseFloat(values.fio2);
+    const pao2 = parseFloat(values.pao2);
+    const paco2 = parseFloat(values.paco2);
+    const patm = parseFloat(values.patm);
+
+    if (isNaN(map) || isNaN(fio2) || isNaN(pao2)) {
+      return;
+    }
+
+    // Oxygenation Index (OI) = (MAP × FiO2 × 100) / PaO2
+    // Higher OI indicates worse oxygenation
+    const oi = (map * fio2 * 100) / pao2;
+
+    // OI Risk Stratification
+    let oiInterpretation = '';
+    let oiSeverity = 'normal';
+    let recommendation = '';
+
+    if (oi < 5) {
+      oiInterpretation = 'Mild respiratory failure';
+      oiSeverity = 'low';
+    } else if (oi < 15) {
+      oiInterpretation = 'Moderate respiratory failure';
+      oiSeverity = 'medium';
+    } else if (oi < 25) {
+      oiInterpretation = 'Severe respiratory failure';
+      oiSeverity = 'high';
+      recommendation = 'Consider iNO therapy';
+    } else if (oi < 40) {
+      oiInterpretation = 'Very severe respiratory failure';
+      oiSeverity = 'critical';
+      recommendation = 'iNO indicated, consider ECMO evaluation';
+    } else {
+      oiInterpretation = 'Critical - ECMO criteria';
+      oiSeverity = 'critical';
+      recommendation = 'Urgent ECMO evaluation if sustained';
+    }
+
+    // A-a Gradient calculation if we have PaCO2
+    let aaGradient = null;
+    let aaInterpretation = '';
+    if (!isNaN(paco2)) {
+      // PAO2 = FiO2 × (Patm - 47) - (PaCO2 / 0.8)
+      // Water vapor pressure at body temp = 47 mmHg
+      // Respiratory quotient = 0.8
+      const pao2Alveolar = fio2 * (patm - 47) - (paco2 / 0.8);
+      aaGradient = pao2Alveolar - pao2;
+
+      // Normal A-a gradient in neonates on room air: 5-15 mmHg
+      // Increases with higher FiO2: normal = (Age/4) + 4 for adults
+      // For neonates: typically <20 mmHg on room air
+      const expectedAa = fio2 <= 0.21 ? 15 : fio2 * 50; // Rough estimate
+
+      if (aaGradient < 15) {
+        aaInterpretation = 'Normal - likely hypoventilation if hypoxic';
+      } else if (aaGradient < 30) {
+        aaInterpretation = 'Mildly elevated - possible V/Q mismatch';
+      } else if (aaGradient < 50) {
+        aaInterpretation = 'Moderately elevated - significant V/Q mismatch or shunt';
+      } else {
+        aaInterpretation = 'Severely elevated - major shunt physiology';
+      }
+    }
+
+    // PF Ratio (PaO2/FiO2 ratio)
+    const pfRatio = pao2 / fio2;
+    let pfInterpretation = '';
+    if (pfRatio >= 400) {
+      pfInterpretation = 'Normal';
+    } else if (pfRatio >= 300) {
+      pfInterpretation = 'Mild impairment';
+    } else if (pfRatio >= 200) {
+      pfInterpretation = 'Moderate (ARDS criteria)';
+    } else if (pfRatio >= 100) {
+      pfInterpretation = 'Severe ARDS';
+    } else {
+      pfInterpretation = 'Critical';
+    }
+
+    setResult({
+      oi: oi.toFixed(1),
+      oiInterpretation,
+      oiSeverity,
+      recommendation,
+      aaGradient: aaGradient !== null ? aaGradient.toFixed(1) : null,
+      aaInterpretation,
+      pfRatio: pfRatio.toFixed(0),
+      pfInterpretation,
+    });
+  };
+
+  return (
+    <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+      <h3 className="text-lg font-semibold text-white mb-2">Oxygenation Index & A-a Gradient</h3>
+      <p className="text-sm text-slate-400 mb-4">Critical metrics for respiratory failure assessment</p>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">MAP (cmH2O)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={values.map}
+              onChange={(e) => setValues({ ...values, map: e.target.value })}
+              placeholder="e.g., 12"
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+            />
+            <span className="text-xs text-slate-500">Mean Airway Pressure</span>
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">FiO2 (decimal)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.21"
+              max="1.0"
+              value={values.fio2}
+              onChange={(e) => setValues({ ...values, fio2: e.target.value })}
+              placeholder="e.g., 0.60"
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+            />
+            <span className="text-xs text-slate-500">0.21 to 1.0</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">PaO2 (mmHg)</label>
+            <input
+              type="number"
+              value={values.pao2}
+              onChange={(e) => setValues({ ...values, pao2: e.target.value })}
+              placeholder="e.g., 55"
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">PaCO2 (mmHg) - optional</label>
+            <input
+              type="number"
+              value={values.paco2}
+              onChange={(e) => setValues({ ...values, paco2: e.target.value })}
+              placeholder="e.g., 45"
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+            />
+            <span className="text-xs text-slate-500">For A-a gradient calculation</span>
+          </div>
+        </div>
+
+        <button
+          onClick={calculate}
+          disabled={!values.map || !values.fio2 || !values.pao2}
+          className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 text-white font-medium py-2 rounded-lg transition-colors"
+        >
+          Calculate
+        </button>
+
+        {result && (
+          <div className="mt-4 space-y-4">
+            {/* Oxygenation Index */}
+            <div className={`p-4 rounded-lg border ${
+              result.oiSeverity === 'critical' ? 'bg-red-900/30 border-red-500/50' :
+              result.oiSeverity === 'high' ? 'bg-orange-900/30 border-orange-500/50' :
+              result.oiSeverity === 'medium' ? 'bg-yellow-900/30 border-yellow-500/50' :
+              'bg-green-900/30 border-green-500/50'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-300">Oxygenation Index (OI)</span>
+                <span className={`text-3xl font-bold ${
+                  result.oiSeverity === 'critical' ? 'text-red-400' :
+                  result.oiSeverity === 'high' ? 'text-orange-400' :
+                  result.oiSeverity === 'medium' ? 'text-yellow-400' : 'text-green-400'
+                }`}>
+                  {result.oi}
+                </span>
+              </div>
+              <p className={`text-sm ${
+                result.oiSeverity === 'critical' ? 'text-red-300' :
+                result.oiSeverity === 'high' ? 'text-orange-300' :
+                result.oiSeverity === 'medium' ? 'text-yellow-300' : 'text-green-300'
+              }`}>
+                {result.oiInterpretation}
+              </p>
+              {result.recommendation && (
+                <p className="text-sm text-white font-medium mt-2 p-2 bg-slate-700/50 rounded">
+                  {result.recommendation}
+                </p>
+              )}
+            </div>
+
+            {/* P/F Ratio */}
+            <div className="p-4 bg-slate-700/30 rounded-lg">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-slate-400">P/F Ratio (PaO2/FiO2)</span>
+                <span className="text-xl font-bold text-cyan-400">{result.pfRatio}</span>
+              </div>
+              <p className="text-sm text-slate-300">{result.pfInterpretation}</p>
+            </div>
+
+            {/* A-a Gradient */}
+            {result.aaGradient && (
+              <div className="p-4 bg-slate-700/30 rounded-lg">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-slate-400">A-a Gradient</span>
+                  <span className="text-xl font-bold text-purple-400">{result.aaGradient} mmHg</span>
+                </div>
+                <p className="text-sm text-slate-300">{result.aaInterpretation}</p>
+              </div>
+            )}
+
+            {/* Reference */}
+            <div className="text-xs text-slate-500 p-3 bg-slate-700/20 rounded">
+              <p className="font-medium text-slate-400 mb-2">OI Thresholds (PPHN/Respiratory Failure):</p>
+              <div className="grid grid-cols-2 gap-2">
+                <span>OI 15-25: Consider iNO</span>
+                <span>OI 25-40: iNO + ECMO evaluation</span>
+                <span>OI &gt;40: ECMO criteria</span>
+                <span>OI sustained &gt;40 for 4h: ECMO</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// NEC Risk Calculator with Bell Staging
+function NECRiskCalculator() {
+  const [mode, setMode] = useState('risk'); // 'risk' or 'staging'
+  const [riskFactors, setRiskFactors] = useState({
+    ga: '',
+    birthWeight: '',
+    formulaFeeding: false,
+    rapidFeedAdvance: false,
+    prbc: false,
+    pda: false,
+    umbilicalCath: false,
+    inotropes: false,
+    polycythemia: false,
+    chorioamnionitis: false,
+  });
+  const [stagingFindings, setStagingFindings] = useState({
+    abdominalDistension: false,
+    feedingIntolerance: false,
+    occultBlood: false,
+    grossBlood: false,
+    bilious: false,
+    ileus: false,
+    pneumatosis: false,
+    portalVenousGas: false,
+    pneumoperitoneum: false,
+    lethargy: false,
+    apnea: false,
+    tempInstability: false,
+    acidosis: false,
+    thrombocytopenia: false,
+    dic: false,
+    shock: false,
+  });
+  const [result, setResult] = useState(null);
+
+  const calculateRisk = () => {
+    let riskScore = 0;
+    let riskFactorsList = [];
+
+    // GA-based risk
+    const ga = parseInt(riskFactors.ga);
+    if (ga < 28) {
+      riskScore += 4;
+      riskFactorsList.push('Extremely preterm (<28 weeks)');
+    } else if (ga < 32) {
+      riskScore += 3;
+      riskFactorsList.push('Very preterm (28-31 weeks)');
+    } else if (ga < 37) {
+      riskScore += 1;
+      riskFactorsList.push('Late preterm (32-36 weeks)');
+    }
+
+    // Weight-based risk
+    const bw = parseInt(riskFactors.birthWeight);
+    if (bw < 1000) {
+      riskScore += 3;
+      riskFactorsList.push('ELBW (<1000g)');
+    } else if (bw < 1500) {
+      riskScore += 2;
+      riskFactorsList.push('VLBW (1000-1500g)');
+    }
+
+    // Other risk factors
+    if (riskFactors.formulaFeeding) {
+      riskScore += 2;
+      riskFactorsList.push('Formula feeding (vs exclusive HM)');
+    }
+    if (riskFactors.rapidFeedAdvance) {
+      riskScore += 2;
+      riskFactorsList.push('Rapid feed advancement (>30mL/kg/day)');
+    }
+    if (riskFactors.prbc) {
+      riskScore += 2;
+      riskFactorsList.push('Recent PRBC transfusion');
+    }
+    if (riskFactors.pda) {
+      riskScore += 1;
+      riskFactorsList.push('Hemodynamically significant PDA');
+    }
+    if (riskFactors.umbilicalCath) {
+      riskScore += 1;
+      riskFactorsList.push('Umbilical catheter');
+    }
+    if (riskFactors.inotropes) {
+      riskScore += 2;
+      riskFactorsList.push('Inotrope use');
+    }
+    if (riskFactors.polycythemia) {
+      riskScore += 1;
+      riskFactorsList.push('Polycythemia');
+    }
+    if (riskFactors.chorioamnionitis) {
+      riskScore += 1;
+      riskFactorsList.push('Maternal chorioamnionitis');
+    }
+
+    // Risk category
+    let riskCategory = '';
+    let riskLevel = 'low';
+    if (riskScore >= 10) {
+      riskCategory = 'High Risk';
+      riskLevel = 'high';
+    } else if (riskScore >= 5) {
+      riskCategory = 'Moderate Risk';
+      riskLevel = 'medium';
+    } else {
+      riskCategory = 'Low Risk';
+      riskLevel = 'low';
+    }
+
+    setResult({
+      type: 'risk',
+      score: riskScore,
+      category: riskCategory,
+      level: riskLevel,
+      factors: riskFactorsList,
+    });
+  };
+
+  const calculateStaging = () => {
+    let stage = '';
+    let stageDetails = '';
+    let severity = 'low';
+    let findings = [];
+
+    // Collect present findings
+    if (stagingFindings.abdominalDistension) findings.push('Abdominal distension');
+    if (stagingFindings.feedingIntolerance) findings.push('Feeding intolerance');
+    if (stagingFindings.occultBlood) findings.push('Occult blood in stool');
+    if (stagingFindings.grossBlood) findings.push('Gross blood in stool');
+    if (stagingFindings.bilious) findings.push('Bilious gastric residuals');
+    if (stagingFindings.ileus) findings.push('Ileus on X-ray');
+    if (stagingFindings.pneumatosis) findings.push('Pneumatosis intestinalis');
+    if (stagingFindings.portalVenousGas) findings.push('Portal venous gas');
+    if (stagingFindings.pneumoperitoneum) findings.push('Pneumoperitoneum');
+    if (stagingFindings.lethargy) findings.push('Lethargy');
+    if (stagingFindings.apnea) findings.push('Apnea/bradycardia');
+    if (stagingFindings.tempInstability) findings.push('Temperature instability');
+    if (stagingFindings.acidosis) findings.push('Metabolic acidosis');
+    if (stagingFindings.thrombocytopenia) findings.push('Thrombocytopenia');
+    if (stagingFindings.dic) findings.push('DIC');
+    if (stagingFindings.shock) findings.push('Hypotension/shock');
+
+    // Bell Staging Criteria
+    if (stagingFindings.pneumoperitoneum) {
+      stage = 'Stage IIIB';
+      stageDetails = 'Advanced NEC - Intestinal perforation';
+      severity = 'critical';
+    } else if (stagingFindings.pneumatosis && (stagingFindings.shock || stagingFindings.dic || stagingFindings.acidosis)) {
+      stage = 'Stage IIIA';
+      stageDetails = 'Advanced NEC - Critically ill, intact bowel';
+      severity = 'critical';
+    } else if (stagingFindings.pneumatosis && (stagingFindings.portalVenousGas || stagingFindings.grossBlood)) {
+      stage = 'Stage IIB';
+      stageDetails = 'Definite NEC - Moderately ill';
+      severity = 'high';
+    } else if (stagingFindings.pneumatosis) {
+      stage = 'Stage IIA';
+      stageDetails = 'Definite NEC - Mildly ill';
+      severity = 'high';
+    } else if ((stagingFindings.abdominalDistension || stagingFindings.feedingIntolerance) && (stagingFindings.grossBlood || stagingFindings.ileus)) {
+      stage = 'Stage IB';
+      stageDetails = 'Suspected NEC - Systemic symptoms';
+      severity = 'medium';
+    } else if (stagingFindings.abdominalDistension || stagingFindings.feedingIntolerance || stagingFindings.occultBlood) {
+      stage = 'Stage IA';
+      stageDetails = 'Suspected NEC - Mild symptoms';
+      severity = 'medium';
+    } else {
+      stage = 'Not NEC';
+      stageDetails = 'Insufficient findings for NEC diagnosis';
+      severity = 'low';
+    }
+
+    setResult({
+      type: 'staging',
+      stage,
+      stageDetails,
+      severity,
+      findings,
+    });
+  };
+
+  return (
+    <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+      <h3 className="text-lg font-semibold text-white mb-2">NEC Risk Assessment & Bell Staging</h3>
+      <p className="text-sm text-slate-400 mb-4">Necrotizing Enterocolitis evaluation</p>
+
+      {/* Mode Toggle */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => { setMode('risk'); setResult(null); }}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            mode === 'risk' ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300'
+          }`}
+        >
+          Risk Assessment
+        </button>
+        <button
+          onClick={() => { setMode('staging'); setResult(null); }}
+          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            mode === 'staging' ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300'
+          }`}
+        >
+          Bell Staging
+        </button>
+      </div>
+
+      {mode === 'risk' ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Gestational Age (weeks)</label>
+              <input
+                type="number"
+                value={riskFactors.ga}
+                onChange={(e) => setRiskFactors({ ...riskFactors, ga: e.target.value })}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+                placeholder="e.g., 28"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Birth Weight (g)</label>
+              <input
+                type="number"
+                value={riskFactors.birthWeight}
+                onChange={(e) => setRiskFactors({ ...riskFactors, birthWeight: e.target.value })}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white"
+                placeholder="e.g., 1000"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { key: 'formulaFeeding', label: 'Formula feeding' },
+              { key: 'rapidFeedAdvance', label: 'Rapid feed advancement' },
+              { key: 'prbc', label: 'Recent PRBC transfusion' },
+              { key: 'pda', label: 'Hemodynamically significant PDA' },
+              { key: 'umbilicalCath', label: 'Umbilical catheter' },
+              { key: 'inotropes', label: 'Inotrope use' },
+              { key: 'polycythemia', label: 'Polycythemia' },
+              { key: 'chorioamnionitis', label: 'Chorioamnionitis' },
+            ].map((item) => (
+              <label key={item.key} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded cursor-pointer hover:bg-slate-700/50">
+                <input
+                  type="checkbox"
+                  checked={riskFactors[item.key]}
+                  onChange={(e) => setRiskFactors({ ...riskFactors, [item.key]: e.target.checked })}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm text-slate-300">{item.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <button
+            onClick={calculateRisk}
+            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg"
+          >
+            Calculate Risk
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <div className="border-b border-slate-700 pb-2">
+              <h4 className="text-sm font-medium text-yellow-400">GI Symptoms</h4>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {[
+                  { key: 'abdominalDistension', label: 'Abdominal distension' },
+                  { key: 'feedingIntolerance', label: 'Feeding intolerance/residuals' },
+                  { key: 'occultBlood', label: 'Occult blood in stool' },
+                  { key: 'grossBlood', label: 'Gross blood in stool' },
+                  { key: 'bilious', label: 'Bilious gastric residuals' },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={stagingFindings[item.key]}
+                      onChange={(e) => setStagingFindings({ ...stagingFindings, [item.key]: e.target.checked })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm text-slate-300">{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-b border-slate-700 pb-2">
+              <h4 className="text-sm font-medium text-orange-400">Radiological Findings</h4>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {[
+                  { key: 'ileus', label: 'Ileus/dilated bowel loops' },
+                  { key: 'pneumatosis', label: 'Pneumatosis intestinalis' },
+                  { key: 'portalVenousGas', label: 'Portal venous gas' },
+                  { key: 'pneumoperitoneum', label: 'Pneumoperitoneum (free air)' },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={stagingFindings[item.key]}
+                      onChange={(e) => setStagingFindings({ ...stagingFindings, [item.key]: e.target.checked })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm text-slate-300">{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium text-red-400">Systemic Signs</h4>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {[
+                  { key: 'lethargy', label: 'Lethargy' },
+                  { key: 'apnea', label: 'Apnea/bradycardia' },
+                  { key: 'tempInstability', label: 'Temperature instability' },
+                  { key: 'acidosis', label: 'Metabolic acidosis' },
+                  { key: 'thrombocytopenia', label: 'Thrombocytopenia' },
+                  { key: 'dic', label: 'DIC' },
+                  { key: 'shock', label: 'Hypotension/shock' },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-2 p-2 bg-slate-700/30 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={stagingFindings[item.key]}
+                      onChange={(e) => setStagingFindings({ ...stagingFindings, [item.key]: e.target.checked })}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm text-slate-300">{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={calculateStaging}
+            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg"
+          >
+            Determine Stage
+          </button>
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-4">
+          {result.type === 'risk' ? (
+            <div className={`p-4 rounded-lg border ${
+              result.level === 'high' ? 'bg-red-900/30 border-red-500/50' :
+              result.level === 'medium' ? 'bg-yellow-900/30 border-yellow-500/50' :
+              'bg-green-900/30 border-green-500/50'
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-slate-300">Risk Score</span>
+                <span className={`text-3xl font-bold ${
+                  result.level === 'high' ? 'text-red-400' :
+                  result.level === 'medium' ? 'text-yellow-400' : 'text-green-400'
+                }`}>
+                  {result.score}
+                </span>
+              </div>
+              <p className={`text-lg font-medium mb-3 ${
+                result.level === 'high' ? 'text-red-300' :
+                result.level === 'medium' ? 'text-yellow-300' : 'text-green-300'
+              }`}>
+                {result.category}
+              </p>
+              {result.factors.length > 0 && (
+                <div className="text-sm">
+                  <span className="text-slate-400">Contributing factors:</span>
+                  <ul className="list-disc list-inside text-slate-300 mt-1">
+                    {result.factors.map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={`p-4 rounded-lg border ${
+              result.severity === 'critical' ? 'bg-red-900/30 border-red-500/50' :
+              result.severity === 'high' ? 'bg-orange-900/30 border-orange-500/50' :
+              result.severity === 'medium' ? 'bg-yellow-900/30 border-yellow-500/50' :
+              'bg-green-900/30 border-green-500/50'
+            }`}>
+              <div className="mb-3">
+                <span className={`text-2xl font-bold ${
+                  result.severity === 'critical' ? 'text-red-400' :
+                  result.severity === 'high' ? 'text-orange-400' :
+                  result.severity === 'medium' ? 'text-yellow-400' : 'text-green-400'
+                }`}>
+                  {result.stage}
+                </span>
+                <p className="text-slate-300 mt-1">{result.stageDetails}</p>
+              </div>
+              {result.findings.length > 0 && (
+                <div className="text-sm border-t border-slate-600 pt-2">
+                  <span className="text-slate-400">Present findings:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {result.findings.map((f, i) => (
+                      <span key={i} className="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">{f}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 text-xs text-slate-500 p-3 bg-slate-700/20 rounded">
+            <p className="font-medium text-slate-400 mb-2">Bell Staging Criteria (Modified):</p>
+            <div className="space-y-1">
+              <p><span className="text-yellow-400">Stage I</span>: Suspected - non-specific signs, occult blood</p>
+              <p><span className="text-orange-400">Stage II</span>: Definite - pneumatosis intestinalis</p>
+              <p><span className="text-red-400">Stage III</span>: Advanced - perforation or critically ill</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
