@@ -4,6 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../../components/AppShell';
 import { useToast } from '@/components/Toast';
 
+// Helper to extract error message from API response
+const getErrorMessage = (errorData, fallback) => {
+  return errorData?.error?.message || errorData?.message ||
+    (typeof errorData?.error === 'string' ? errorData.error : fallback);
+};
+
 export default function DischargePage() {
   const toast = useToast();
 
@@ -25,9 +31,7 @@ export default function DischargePage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData.error?.message || errorData.message ||
-                        (typeof errorData.error === 'string' ? errorData.error : 'Failed to fetch patients');
-        throw new Error(errorMsg);
+        throw new Error(getErrorMessage(errorData, 'Failed to fetch patients'));
       }
 
       const data = await response.json();
@@ -50,8 +54,9 @@ export default function DischargePage() {
       }
     } catch (err) {
       console.error('Error fetching patients:', err);
-      setError(err.message);
-      toast.error('Failed to load patients: ' + err.message);
+      const message = err.message === 'Failed to fetch' ? 'Network error - please check your connection' : err.message;
+      setError(message);
+      toast.error('Failed to load patients: ' + message);
     } finally {
       setLoading(false);
     }
@@ -66,7 +71,7 @@ export default function DischargePage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to fetch discharge plan');
+        throw new Error(getErrorMessage(errorData, 'Failed to fetch discharge plan'));
       }
 
       const data = await response.json();
@@ -88,7 +93,7 @@ export default function DischargePage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to fetch readiness');
+        throw new Error(getErrorMessage(errorData, 'Failed to fetch readiness'));
       }
 
       const data = await response.json();
@@ -136,7 +141,7 @@ export default function DischargePage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to update item');
+        throw new Error(getErrorMessage(errorData, 'Failed to update item'));
       }
 
       const data = await response.json();
@@ -185,7 +190,7 @@ export default function DischargePage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to complete discharge');
+        throw new Error(getErrorMessage(errorData, 'Failed to complete discharge'));
       }
 
       toast.success(`${selectedPatient.name} has been discharged successfully!`);
