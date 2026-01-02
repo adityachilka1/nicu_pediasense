@@ -67,16 +67,19 @@ export const GET = withErrorHandler(async (request) => {
 
   const { searchParams } = new URL(request.url);
 
-  // Parse and validate query parameters
-  const queryResult = flowsheetQuerySchema.safeParse({
+  // Build query object, filtering out null values (searchParams.get returns null for missing params)
+  const queryObj = {
     patientId: searchParams.get('patientId'),
-    date: searchParams.get('date'),
-    startDate: searchParams.get('startDate'),
-    endDate: searchParams.get('endDate'),
-  });
+  };
+  if (searchParams.get('date')) queryObj.date = searchParams.get('date');
+  if (searchParams.get('startDate')) queryObj.startDate = searchParams.get('startDate');
+  if (searchParams.get('endDate')) queryObj.endDate = searchParams.get('endDate');
+
+  // Parse and validate query parameters
+  const queryResult = flowsheetQuerySchema.safeParse(queryObj);
 
   if (!queryResult.success) {
-    const errors = queryResult.error?.errors || [];
+    const errors = queryResult.error?.issues || queryResult.error?.errors || [];
     throw new ValidationError(
       errors.map(err => ({
         field: Array.isArray(err.path) ? err.path.join('.') : String(err.path || 'unknown'),
