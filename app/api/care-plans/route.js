@@ -132,7 +132,9 @@ export const GET = withErrorHandler(async (request) => {
           skipped: 0,
         };
       }
-      itemStatsByPlan[row.carePlanId][row.status] = row._count;
+      // Convert uppercase enum status to lowercase key for consistent access
+      const statusKey = row.status.toLowerCase();
+      itemStatsByPlan[row.carePlanId][statusKey] = row._count;
       itemStatsByPlan[row.carePlanId].total += row._count;
     }
   }
