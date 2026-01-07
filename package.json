@@ -25,11 +25,9 @@
     "seed": "node --experimental-vm-modules prisma/seed.js"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "aedes": "^0.51.3",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.5.0",
     "dotenv": "^17.2.3",
     "ioredis": "^5.8.2",
     "mqtt": "^5.14.1",
