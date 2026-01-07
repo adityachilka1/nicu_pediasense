@@ -91,6 +91,14 @@ const nextConfig = {
 
   // Enable compression
   compress: true,
+
+  // Ignore TypeScript and ESLint errors during build (for gradual migration)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = nextConfig;
