@@ -28,23 +28,8 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
   },
-  {
-    // Content Security Policy
-    // Note: 'unsafe-inline' and 'unsafe-eval' are required for Next.js
-    // In production, consider using nonces for stricter CSP
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      "connect-src 'self' ws: wss:",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; '),
-  },
+  // CSP removed - Next.js 16+ handles this automatically with nonces
+  // Re-enable with proper nonce configuration if needed
 ];
 
 // Add HSTS header only in production
