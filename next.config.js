@@ -28,8 +28,11 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
   },
-  // CSP removed - Next.js 16+ handles this automatically with nonces
-  // Re-enable with proper nonce configuration if needed
+  {
+    // Override Next.js automatic CSP with a permissive one
+    key: 'Content-Security-Policy',
+    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss: https://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  },
 ];
 
 // Add HSTS header only in production
