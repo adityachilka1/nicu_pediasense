@@ -142,11 +142,104 @@ model Vital {
   bpMean      Int? @map("bp_mean")
 
   // Metadata
-  source     String   @default("monitor") // monitor, manual, device
+  source     String   @default("monitor") // monitor, manual, device, camera
   recordedAt DateTime @default(now()) @map("recorded_at")
 
+  // OCR/Camera-specific metadata (for camera-based vitals)
+  confidence     Float?  // OCR confidence score (0.0-1.0)
+  sourceMetadata String? @map("source_metadata") // JSON: { cameraId, inferenceTimeMs, modelVersion, etc. }
+
   @@index([patientId, recordedAt])
+  @@index([source, confidence]) // Query camera vitals by confidence
   @@map("vitals")
+}
+
+// =====================================================
+// CAMERA SYSTEM (OCR-based Vitals Monitoring)
+// =====================================================
+
+model Camera {
+  id       Int    @id @default(autoincrement())
+  cameraId String @unique @map("camera_id") // camera-001, camera-002, etc.
+
+  // Assignment
+  patientId Int?     @map("patient_id")
+  bedId     Int?     @map("bed_id")
+  location  String? // "Bed 1", "Room 3", etc.
+
+  // Configuration
+  rtspUrl      String  @map("rtsp_url") // rtsp://192.168.1.101:8554/camera-001
+  model        String  @default("Pi Zero 2W") // Camera hardware model
+  manufacturer String  @default("Raspberry Pi Foundation")
+
+  // Status
+  status         String    @default("active") // active, inactive, error, offline, maintenance
+  lastPingAt     DateTime? @map("last_ping_at")
+  lastInferenceAt DateTime? @map("last_inference_at")
+
+  // Performance metrics
+  avgConfidence     Float?   @default(0.0) @map("avg_confidence") // Running average OCR confidence
+  totalInferences   Int      @default(0) @map("total_inferences")
+  failedInferences  Int      @default(0) @map("failed_inferences")
+  successRate       Float?   @map("success_rate") // Calculated: (total - failed) / total * 100
+
+  // Hardware info
+  firmwareVersion String? @map("firmware_version")
+  ipAddress       String? @map("ip_address")
+
+  // Calibration & Maintenance
+  lastCalibration DateTime? @map("last_calibration")
+  nextCalibration DateTime? @map("next_calibration")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ocrLogs OcrLog[]
+
+  @@index([cameraId])
+  @@index([patientId])
+  @@index([bedId])
+  @@index([status])
+  @@map("cameras")
+}
+
+model OcrLog {
+  id       Int     @id @default(autoincrement())
+  cameraId String  @map("camera_id")
+  camera   Camera  @relation(fields: [cameraId], references: [cameraId], onDelete: Cascade)
+
+  // Associated patient (if any)
+  patientId Int? @map("patient_id")
+
+  // OCR processing results
+  confidence       Float   // 0.0-1.0
+  inferenceTimeMs  Int     @map("inference_time_ms") // Processing time in milliseconds
+  validationPassed Boolean @map("validation_passed") // Did vitals pass plausibility checks?
+
+  // Raw data
+  rawData String @map("raw_data") // JSON string of extracted vitals
+
+  // Error handling
+  error     String? // Error message if inference failed
+  errorType String? @map("error_type") // connection_error, ocr_error, validation_error, etc.
+
+  // Detection metadata
+  screenDetected   Boolean @default(true) @map("screen_detected") // Was monitor screen detected?
+  screenConfidence Float?  @map("screen_confidence") // YOLOv5 detection confidence
+
+  // Model info
+  modelVersion String  @default("yolov5n") @map("model_version")
+  ocrEngine    String  @default("mock") @map("ocr_engine") // mock, tesseract, easyocr, etc.
+
+  // Timestamps
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([cameraId, processedAt])
+  @@index([patientId, processedAt])
+  @@index([validationPassed])
+  @@index([confidence])
+  @@map("ocr_logs")
 }
 
 // =====================================================
