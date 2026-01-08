@@ -222,7 +222,10 @@ export default auth((req) => {
   // Health check endpoint should be public (for load balancers, k8s probes)
   const isHealthRoute = nextUrl.pathname === '/api/health';
 
-  if (isAuthRoute || isHealthRoute) {
+  // Vitals ingestion endpoint should be public (for Pi Zero edge devices)
+  const isVitalsIngestRoute = nextUrl.pathname === '/api/vitals/ingest';
+
+  if (isAuthRoute || isHealthRoute || isVitalsIngestRoute) {
     const response = NextResponse.next();
     return applySecurityHeaders(response, isSecure, nonce);
   }
