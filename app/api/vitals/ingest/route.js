@@ -33,8 +33,9 @@ import { rateLimit, getClientIP } from '@/lib/security';
 export const POST = withErrorHandler(async (request) => {
   const timer = createTimer();
 
-  // Authenticate edge device (use API key or service account)
-  const session = await auth();
+  // TODO: Implement API key authentication for edge devices
+  // For now, auth check is disabled to allow Pi devices to ingest vitals
+  // const session = await auth();
   const clientIP = getClientIP(request);
 
   // Rate limiting (more generous for automated systems)
