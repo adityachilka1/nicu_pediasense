@@ -1,0 +1,117 @@
+# Central OCR Processor Configuration
+# This file configures the central device that receives RTSP streams
+# from Pi Zero 2 W cameras and performs OCR-based vital sign extraction.
+
+# MQTT Configuration
+mqtt:
+  broker: "localhost"  # MQTT broker address
+  port: 1883           # MQTT broker port
+  username: null       # Optional: MQTT username
+  password: null       # Optional: MQTT password
+  qos: 1              # Quality of Service (0, 1, or 2)
+
+# Camera Configurations
+# Each camera streams from a Pi Zero 2 W to this central processor
+cameras:
+  # Camera 1 - Bed 01
+  - patient_id: 1
+    camera_id: "camera-001"
+    rtsp_url: "rtsp://192.168.1.10:8554/camera-001"
+    enabled: true
+
+  # Camera 2 - Bed 02
+  - patient_id: 2
+    camera_id: "camera-002"
+    rtsp_url: "rtsp://192.168.1.11:8554/camera-002"
+    enabled: true
+
+  # Camera 3 - Bed 03
+  - patient_id: 3
+    camera_id: "camera-003"
+    rtsp_url: "rtsp://192.168.1.12:8554/camera-003"
+    enabled: true
+
+  # Camera 4 - Bed 04
+  - patient_id: 4
+    camera_id: "camera-004"
+    rtsp_url: "rtsp://192.168.1.13:8554/camera-004"
+    enabled: true
+
+  # Camera 5 - Bed 05
+  - patient_id: 5
+    camera_id: "camera-005"
+    rtsp_url: "rtsp://192.168.1.14:8554/camera-005"
+    enabled: true
+
+  # Camera 6 - Bed 06
+  - patient_id: 6
+    camera_id: "camera-006"
+    rtsp_url: "rtsp://192.168.1.15:8554/camera-006"
+    enabled: true
+
+  # Camera 7 - Bed 07
+  - patient_id: 7
+    camera_id: "camera-007"
+    rtsp_url: "rtsp://192.168.1.16:8554/camera-007"
+    enabled: true
+
+  # Camera 8 - Bed 08
+  - patient_id: 8
+    camera_id: "camera-008"
+    rtsp_url: "rtsp://192.168.1.17:8554/camera-008"
+    enabled: true
+
+# OCR Model Configuration
+ocr:
+  # Path to YOLOv7 screen detector model
+  screen_detector_model: "./models/yolov7_screen_detector.pt"
+
+  # Path to MobileNetV3 monitor classifier model
+  monitor_classifier_model: "./models/mobilenet_classifier.pth"
+
+  # Path to vitals extractor configuration
+  vitals_extractor_config: "./models/vitals_extractor_config.json"
+
+  # Confidence thresholds
+  min_screen_confidence: 0.85
+  min_vitals_confidence: 0.85
+
+  # Performance settings
+  use_tensorrt: false        # Enable TensorRT optimization (Jetson only)
+  use_gpu: true             # Use GPU acceleration if available
+  inference_batch_size: 1   # Process N frames at once
+
+# Processing Settings
+processing:
+  # How often to process frames (seconds)
+  frame_interval: 1.0
+
+  # Maximum reconnection attempts before giving up
+  max_reconnect_attempts: 5
+
+  # Reconnection delay (seconds)
+  reconnect_delay: 5
+
+# Logging Configuration
+logging:
+  level: "INFO"              # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "/var/log/nicu-ocr-processor.log"
+  max_size_mb: 100          # Max log file size before rotation
+  backup_count: 5           # Number of rotated logs to keep
+
+# Health Monitoring
+health:
+  # Enable health checks
+  enabled: true
+
+  # Health check interval (seconds)
+  interval: 60
+
+  # Alert if inference time exceeds this (milliseconds)
+  max_inference_time_ms: 2000
+
+  # Alert if confidence drops below this
+  min_avg_confidence: 0.80
+
+  # Alert if this many consecutive failures occur
+  max_consecutive_failures: 10

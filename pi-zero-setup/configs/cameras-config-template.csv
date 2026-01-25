@@ -1,0 +1,9 @@
+camera_id,patient_id,bed_number,server_ip,wifi_ssid,wifi_password
+camera-001,1,Bed-01,192.168.1.100,NICU-Network,YourWiFiPassword
+camera-002,2,Bed-02,192.168.1.100,NICU-Network,YourWiFiPassword
+camera-003,3,Bed-03,192.168.1.100,NICU-Network,YourWiFiPassword
+camera-004,4,Bed-04,192.168.1.100,NICU-Network,YourWiFiPassword
+camera-005,5,Bed-05,192.168.1.100,NICU-Network,YourWiFiPassword
+camera-006,6,Bed-06,192.168.1.100,NICU-Network,YourWiFiPassword
+camera-007,7,Bed-07,192.168.1.100,NICU-Network,YourWiFiPassword
+camera-008,8,Bed-08,192.168.1.100,NICU-Network,YourWiFiPassword
